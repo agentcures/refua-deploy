@@ -1,0 +1,63 @@
+name: refua-oncology-prod
+cloud:
+  visibility: public
+  provider: aws
+  region: us-east-1
+openclaw:
+  base_url: https://openclaw.example.org
+  model: openclaw:main
+  timeout_seconds: 180
+  token_secret_name: openclaw-gateway-token
+  token_secret_key: OPENCLAW_GATEWAY_TOKEN
+runtime:
+  namespace: refua-oncology
+  orchestrator: kubernetes
+  campaign:
+    image: ghcr.io/agentcures/ClawCures:latest
+    objective: Run an oncology campaign focused on KRAS G12D and resistance pathways
+    schedule: 0 */6 * * *
+    max_rounds: 4
+    max_calls: 12
+    output_path: /var/lib/refua/output/latest_run.json
+  mcp:
+    image: ghcr.io/agentcures/refua-mcp:latest
+    replicas: 2
+    port: 8000
+    transport: streamable-http
+kubernetes:
+  distribution: eks
+  ingress_class: nginx
+  service_type: ClusterIP
+  storage_class: gp3
+  create_network_policy: false
+  namespace_annotations:
+    owner: refua
+gpu:
+  mode: auto
+  vendor: nvidia
+  count: 1
+  resource_name: nvidia.com/gpu
+  mcp_enabled: true
+  campaign_enabled: false
+  node_selector: {}
+  toleration_key: nvidia.com/gpu
+automation:
+  auto_discover_network: true
+  bootstrap_cluster: true
+  provisioning_level: auto
+  cluster_name: null
+  kubernetes_version: "1.30"
+  node_count: 3
+  node_instance_type: null
+  node_disk_gb: 100
+security:
+  mcp_auth_secret_name: refua-mcp-auth-token
+  mcp_auth_secret_key: REFUA_MCP_AUTH_TOKENS
+  create_placeholder_secrets: true
+network:
+  expose_mcp: true
+  ingress_host: null
+  allowed_hosts: []
+  allowed_origins: []
+storage:
+  output_volume_size: 20Gi
