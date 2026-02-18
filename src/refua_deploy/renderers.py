@@ -47,6 +47,7 @@ def _render_kubernetes(
     out_root: Path,
     resolved: ResolvedAutomation,
 ) -> list[Path]:
+    include_mcp_service = spec.runtime.mcp.mode == "service"
     campaign_image, mcp_image = resolve_images(spec, workspace)
     k8s_dir = out_root / "kubernetes"
     k8s_dir.mkdir(parents=True, exist_ok=True)
@@ -78,16 +79,21 @@ def _render_kubernetes(
             "REFUA_CAMPAIGN_OPENCLAW_BASE_URL": spec.openclaw.base_url,
             "REFUA_CAMPAIGN_OPENCLAW_MODEL": spec.openclaw.model,
             "REFUA_CAMPAIGN_TIMEOUT_SECONDS": str(spec.openclaw.timeout_seconds),
-            "REFUA_MCP_TRANSPORT": spec.runtime.mcp.transport,
-            "REFUA_MCP_HOST": "0.0.0.0",
-            "REFUA_MCP_PORT": str(spec.runtime.mcp.port),
-            "REFUA_MCP_ALLOWED_HOSTS": ",".join(resolved.allowed_hosts),
-            "REFUA_MCP_ALLOWED_ORIGINS": ",".join(resolved.allowed_origins),
             "REFUA_GPU_MODE": spec.gpu.mode,
             "REFUA_GPU_VENDOR": spec.gpu.vendor,
             "REFUA_GPU_COUNT": str(spec.gpu.count),
         },
     }
+    if include_mcp_service:
+        configmap_doc["data"].update(
+            {
+                "REFUA_MCP_TRANSPORT": spec.runtime.mcp.transport,
+                "REFUA_MCP_HOST": "0.0.0.0",
+                "REFUA_MCP_PORT": str(spec.runtime.mcp.port),
+                "REFUA_MCP_ALLOWED_HOSTS": ",".join(resolved.allowed_hosts),
+                "REFUA_MCP_ALLOWED_ORIGINS": ",".join(resolved.allowed_origins),
+            }
+        )
 
     openclaw_secret_placeholder = "__set_openclaw_gateway_token__"
     mcp_secret_placeholder = "__set_mcp_auth_token__"
@@ -108,21 +114,24 @@ def _render_kubernetes(
             "stringData": {
                 spec.openclaw.token_secret_key: openclaw_secret_placeholder,
             },
-        },
-        {
-            "apiVersion": "v1",
-            "kind": "Secret",
-            "metadata": {
-                "name": spec.security.mcp_auth_secret_name,
-                "namespace": spec.runtime.namespace,
-                "labels": labels,
-            },
-            "type": "Opaque",
-            "stringData": {
-                spec.security.mcp_auth_secret_key: mcp_secret_placeholder,
-            },
-        },
+        }
     ]
+    if include_mcp_service:
+        secrets_docs.append(
+            {
+                "apiVersion": "v1",
+                "kind": "Secret",
+                "metadata": {
+                    "name": spec.security.mcp_auth_secret_name,
+                    "namespace": spec.runtime.namespace,
+                    "labels": labels,
+                },
+                "type": "Opaque",
+                "stringData": {
+                    spec.security.mcp_auth_secret_key: mcp_secret_placeholder,
+                },
+            }
+        )
 
     output_claim_name = f"{spec.runtime.namespace}-campaign-output"
     pvc_spec: dict[str, Any] = {
@@ -147,114 +156,117 @@ def _render_kubernetes(
         "spec": pvc_spec,
     }
 
-    mcp_container: dict[str, Any] = {
-        "name": "refua-mcp",
-        "image": mcp_image,
-        "imagePullPolicy": "IfNotPresent",
-        "command": ["python", "-m", "refua_mcp.server"],
-        "ports": [
-            {
-                "containerPort": spec.runtime.mcp.port,
-                "name": "http",
-            }
-        ],
-        "env": [
-            {
-                "name": "REFUA_MCP_TRANSPORT",
-                "value": spec.runtime.mcp.transport,
-            },
-            {
-                "name": "REFUA_MCP_HOST",
-                "value": "0.0.0.0",
-            },
-            {
-                "name": "REFUA_MCP_PORT",
-                "value": str(spec.runtime.mcp.port),
-            },
-            {
-                "name": "REFUA_MCP_ALLOWED_HOSTS",
-                "value": ",".join(resolved.allowed_hosts),
-            },
-            {
-                "name": "REFUA_MCP_ALLOWED_ORIGINS",
-                "value": ",".join(resolved.allowed_origins),
-            },
-            {
-                "name": "REFUA_MCP_AUTH_TOKENS",
-                "valueFrom": {
-                    "secretKeyRef": {
-                        "name": spec.security.mcp_auth_secret_name,
-                        "key": spec.security.mcp_auth_secret_key,
-                    }
-                },
-            },
-            *_gpu_container_env(spec, enabled=spec.gpu.mcp_enabled),
-        ],
-    }
-    gpu_resources = _gpu_resource_requests(spec, enabled=spec.gpu.mcp_enabled)
-    if gpu_resources is not None:
-        mcp_container["resources"] = gpu_resources
-
-    mcp_pod_spec: dict[str, Any] = {
-        "containers": [mcp_container],
-    }
-    _apply_gpu_pod_overrides(
-        mcp_pod_spec,
-        spec=spec,
-        enabled=spec.gpu.mcp_enabled,
-    )
-
-    mcp_deployment_doc = {
-        "apiVersion": "apps/v1",
-        "kind": "Deployment",
-        "metadata": {
-            "name": f"{spec.runtime.namespace}-mcp",
-            "namespace": spec.runtime.namespace,
-            "labels": labels,
-        },
-        "spec": {
-            "replicas": spec.runtime.mcp.replicas,
-            "selector": {
-                "matchLabels": {
-                    "app.kubernetes.io/component": "mcp",
-                    "app.kubernetes.io/name": spec.name,
-                }
-            },
-            "template": {
-                "metadata": {
-                    "labels": {
-                        **labels,
-                        "app.kubernetes.io/component": "mcp",
-                    }
-                },
-                "spec": mcp_pod_spec,
-            },
-        },
-    }
-
-    mcp_service_doc = {
-        "apiVersion": "v1",
-        "kind": "Service",
-        "metadata": {
-            "name": f"{spec.runtime.namespace}-mcp",
-            "namespace": spec.runtime.namespace,
-            "labels": labels,
-        },
-        "spec": {
-            "type": spec.kubernetes.service_type,
-            "selector": {
-                "app.kubernetes.io/component": "mcp",
-                "app.kubernetes.io/name": spec.name,
-            },
+    mcp_deployment_doc: dict[str, Any] | None = None
+    mcp_service_doc: dict[str, Any] | None = None
+    if include_mcp_service:
+        mcp_container: dict[str, Any] = {
+            "name": "refua-mcp",
+            "image": mcp_image,
+            "imagePullPolicy": "IfNotPresent",
+            "command": ["python", "-m", "refua_mcp.server"],
             "ports": [
                 {
+                    "containerPort": spec.runtime.mcp.port,
                     "name": "http",
-                    "port": spec.runtime.mcp.port,
-                    "targetPort": spec.runtime.mcp.port,
                 }
             ],
-        },
-    }
+            "env": [
+                {
+                    "name": "REFUA_MCP_TRANSPORT",
+                    "value": spec.runtime.mcp.transport,
+                },
+                {
+                    "name": "REFUA_MCP_HOST",
+                    "value": "0.0.0.0",
+                },
+                {
+                    "name": "REFUA_MCP_PORT",
+                    "value": str(spec.runtime.mcp.port),
+                },
+                {
+                    "name": "REFUA_MCP_ALLOWED_HOSTS",
+                    "value": ",".join(resolved.allowed_hosts),
+                },
+                {
+                    "name": "REFUA_MCP_ALLOWED_ORIGINS",
+                    "value": ",".join(resolved.allowed_origins),
+                },
+                {
+                    "name": "REFUA_MCP_AUTH_TOKENS",
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": spec.security.mcp_auth_secret_name,
+                            "key": spec.security.mcp_auth_secret_key,
+                        }
+                    },
+                },
+                *_gpu_container_env(spec, enabled=spec.gpu.mcp_enabled),
+            ],
+        }
+        gpu_resources = _gpu_resource_requests(spec, enabled=spec.gpu.mcp_enabled)
+        if gpu_resources is not None:
+            mcp_container["resources"] = gpu_resources
+
+        mcp_pod_spec: dict[str, Any] = {
+            "containers": [mcp_container],
+        }
+        _apply_gpu_pod_overrides(
+            mcp_pod_spec,
+            spec=spec,
+            enabled=spec.gpu.mcp_enabled,
+        )
+
+        mcp_deployment_doc = {
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
+            "metadata": {
+                "name": f"{spec.runtime.namespace}-mcp",
+                "namespace": spec.runtime.namespace,
+                "labels": labels,
+            },
+            "spec": {
+                "replicas": spec.runtime.mcp.replicas,
+                "selector": {
+                    "matchLabels": {
+                        "app.kubernetes.io/component": "mcp",
+                        "app.kubernetes.io/name": spec.name,
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            **labels,
+                            "app.kubernetes.io/component": "mcp",
+                        }
+                    },
+                    "spec": mcp_pod_spec,
+                },
+            },
+        }
+
+        mcp_service_doc = {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "name": f"{spec.runtime.namespace}-mcp",
+                "namespace": spec.runtime.namespace,
+                "labels": labels,
+            },
+            "spec": {
+                "type": spec.kubernetes.service_type,
+                "selector": {
+                    "app.kubernetes.io/component": "mcp",
+                    "app.kubernetes.io/name": spec.name,
+                },
+                "ports": [
+                    {
+                        "name": "http",
+                        "port": spec.runtime.mcp.port,
+                        "targetPort": spec.runtime.mcp.port,
+                    }
+                ],
+            },
+        }
 
     campaign_container: dict[str, Any] = {
         "name": "ClawCures",
@@ -366,31 +378,32 @@ def _render_kubernetes(
     _write_yaml(configmap_path, configmap_doc)
     _write_yaml_documents(secrets_path, secrets_docs)
     _write_yaml(pvc_path, pvc_doc)
-    _write_yaml(deployment_path, mcp_deployment_doc)
-    _write_yaml(service_path, mcp_service_doc)
     _write_yaml(cronjob_path, campaign_cronjob_doc)
+    if include_mcp_service:
+        _write_yaml(deployment_path, mcp_deployment_doc or {})
+        _write_yaml(service_path, mcp_service_doc or {})
 
     output_paths = [
         namespace_path,
         configmap_path,
         secrets_path,
         pvc_path,
-        deployment_path,
-        service_path,
         cronjob_path,
     ]
+    if include_mcp_service:
+        output_paths.extend([deployment_path, service_path])
 
     kustomization_resources = [
         "namespace.yaml",
         "configmap.yaml",
         "secrets.template.yaml",
         "campaign-output-pvc.yaml",
-        "mcp-deployment.yaml",
-        "mcp-service.yaml",
         "campaign-cronjob.yaml",
     ]
+    if include_mcp_service:
+        kustomization_resources.extend(["mcp-deployment.yaml", "mcp-service.yaml"])
 
-    if spec.kubernetes.create_network_policy:
+    if spec.kubernetes.create_network_policy and include_mcp_service:
         network_policy_doc: dict[str, Any] = {
             "apiVersion": "networking.k8s.io/v1",
             "kind": "NetworkPolicy",
@@ -441,7 +454,7 @@ def _render_kubernetes(
         output_paths.append(network_policy_path)
         kustomization_resources.append("network-policy.yaml")
 
-    if spec.network.expose_mcp and resolved.ingress_host:
+    if include_mcp_service and spec.network.expose_mcp and resolved.ingress_host:
         ingress_doc: dict[str, Any] = {
             "apiVersion": "networking.k8s.io/v1",
             "kind": "Ingress",

@@ -5,6 +5,7 @@ from typing import Literal
 
 CloudVisibility = Literal["public", "private"]
 OrchestratorType = Literal["kubernetes", "compose"]
+McpMode = Literal["inprocess", "service"]
 KubernetesDistribution = Literal[
     "generic",
     "eks",
@@ -58,6 +59,7 @@ class CampaignSettings:
 
 @dataclass(slots=True)
 class McpSettings:
+    mode: McpMode = "inprocess"
     image: str | None = None
     replicas: int = 1
     port: int = 8000

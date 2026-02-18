@@ -18,6 +18,7 @@ from refua_deploy.models import (
     GpuVendor,
     KubernetesDistribution,
     KubernetesServiceType,
+    McpMode,
     KubernetesSettings,
     McpSettings,
     NetworkSettings,
@@ -104,6 +105,7 @@ _GPU_RESOURCE_BY_VENDOR = {
     "amd": "amd.com/gpu",
     "intel": "gpu.intel.com/i915",
 }
+_MCP_MODE_VALUES = {"inprocess", "service"}
 _DEFAULT_K8S_DISTRIBUTION_BY_PROVIDER = {
     "aws": "eks",
     "gcp": "gke",
@@ -225,6 +227,7 @@ def spec_from_mapping(data: Mapping[str, Any]) -> DeploymentSpec:
         raise ValueError("runtime.mcp must be a mapping if provided")
 
     mcp = McpSettings(
+        mode=_parse_mcp_mode(_optional_str(mcp_raw, "mode") or "inprocess"),
         image=_optional_str(mcp_raw, "image"),
         replicas=_int(mcp_raw.get("replicas", 1), "runtime.mcp.replicas"),
         port=_int(mcp_raw.get("port", 8000), "runtime.mcp.port"),
@@ -475,6 +478,7 @@ def starter_mapping(
                 "output_path": "/var/lib/refua/output/latest_run.json",
             },
             "mcp": {
+                "mode": "inprocess",
                 "image": mcp_image,
                 "replicas": 1,
                 "port": 8000,
@@ -643,6 +647,14 @@ def _parse_gpu_vendor(value: str) -> GpuVendor:
         allowed = ", ".join(sorted(_GPU_VENDOR_VALUES))
         raise ValueError(f"gpu.vendor must be one of: {allowed}")
     return cast(GpuVendor, normalized)
+
+
+def _parse_mcp_mode(value: str) -> McpMode:
+    normalized = value.strip().lower()
+    if normalized not in _MCP_MODE_VALUES:
+        allowed = ", ".join(sorted(_MCP_MODE_VALUES))
+        raise ValueError(f"runtime.mcp.mode must be one of: {allowed}")
+    return cast(McpMode, normalized)
 
 
 def _default_namespace(name: str) -> str:

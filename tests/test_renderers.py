@@ -51,12 +51,14 @@ def test_render_public_bundle(tmp_path: Path) -> None:
     assert (output_dir / "kubernetes" / "namespace.yaml") in paths
     assert (output_dir / "kubernetes" / "campaign-output-pvc.yaml") in paths
     assert (output_dir / "kubernetes" / "campaign-cronjob.yaml") in paths
-    assert (output_dir / "kubernetes" / "network-policy.yaml") in paths
-    assert (output_dir / "kubernetes" / "mcp-ingress.yaml") in paths
     assert (output_dir / "kubernetes" / "kustomization.yaml") in paths
     assert (output_dir / "bootstrap" / "cluster-bootstrap.sh") in paths
     assert (output_dir / "bootstrap" / "metadata.auto.json") in paths
     assert (output_dir / "bootstrap" / "network.auto.env") in paths
+    assert (output_dir / "kubernetes" / "mcp-deployment.yaml") not in paths
+    assert (output_dir / "kubernetes" / "mcp-service.yaml") not in paths
+    assert (output_dir / "kubernetes" / "mcp-ingress.yaml") not in paths
+    assert (output_dir / "kubernetes" / "network-policy.yaml") not in paths
 
     configmap_payload = yaml.safe_load((output_dir / "kubernetes" / "configmap.yaml").read_text())
     assert configmap_payload["kind"] == "ConfigMap"
@@ -86,8 +88,53 @@ def test_render_public_bundle(tmp_path: Path) -> None:
     secret_docs = list(
         yaml.safe_load_all((output_dir / "kubernetes" / "secrets.template.yaml").read_text())
     )
-    assert len(secret_docs) == 2
+    assert len(secret_docs) == 1
     assert {doc["kind"] for doc in secret_docs} == {"Secret"}
+
+    bootstrap_script = (output_dir / "bootstrap" / "cluster-bootstrap.sh").read_text(
+        encoding="utf-8"
+    )
+    assert "eksctl create cluster" in bootstrap_script
+
+
+def test_render_public_bundle_with_mcp_service_mode(tmp_path: Path) -> None:
+    spec = spec_from_mapping(
+        {
+            "name": "public-service-mcp",
+            "cloud": {
+                "visibility": "public",
+                "provider": "aws",
+                "region": "us-east-1",
+            },
+            "openclaw": {
+                "base_url": "https://openclaw.example.org",
+                "model": "openclaw:main",
+            },
+            "runtime": {
+                "orchestrator": "kubernetes",
+                "mcp": {"mode": "service"},
+            },
+            "kubernetes": {
+                "distribution": "eks",
+                "ingress_class": "nginx",
+                "service_type": "LoadBalancer",
+                "create_network_policy": True,
+            },
+            "network": {
+                "expose_mcp": True,
+                "ingress_host": "campaigns.example.org",
+            },
+        }
+    )
+    workspace = WorkspaceIntegration(root=tmp_path)
+
+    output_dir = tmp_path / "build-public-service-mcp"
+    paths = render_bundle(spec, workspace, output_dir)
+
+    assert (output_dir / "kubernetes" / "mcp-deployment.yaml") in paths
+    assert (output_dir / "kubernetes" / "mcp-service.yaml") in paths
+    assert (output_dir / "kubernetes" / "mcp-ingress.yaml") in paths
+    assert (output_dir / "kubernetes" / "network-policy.yaml") in paths
 
     service_payload = yaml.safe_load((output_dir / "kubernetes" / "mcp-service.yaml").read_text())
     assert service_payload["spec"]["type"] == "LoadBalancer"
@@ -101,11 +148,6 @@ def test_render_public_bundle(tmp_path: Path) -> None:
     assert "REFUA_GPU_MODE" in env_names
     assert "CUDA_VISIBLE_DEVICES" in env_names
     assert "affinity" in mcp_deployment["spec"]["template"]["spec"]
-
-    bootstrap_script = (output_dir / "bootstrap" / "cluster-bootstrap.sh").read_text(
-        encoding="utf-8"
-    )
-    assert "eksctl create cluster" in bootstrap_script
 
 
 def test_render_private_bundle(tmp_path: Path) -> None:
@@ -175,7 +217,7 @@ def test_render_gpu_required_for_kubernetes_and_compose(tmp_path: Path) -> None:
             "name": "gpu-required",
             "cloud": {"visibility": "public", "provider": "aws"},
             "openclaw": {"base_url": "https://openclaw.example.org"},
-            "runtime": {"orchestrator": "kubernetes"},
+            "runtime": {"orchestrator": "kubernetes", "mcp": {"mode": "service"}},
             "gpu": {
                 "mode": "required",
                 "count": 2,

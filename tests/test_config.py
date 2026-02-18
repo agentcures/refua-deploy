@@ -31,6 +31,7 @@ def test_load_spec_public_defaults(tmp_path: Path) -> None:
     assert spec.runtime.namespace == "oncology-prod"
     assert spec.runtime.orchestrator == "kubernetes"
     assert spec.runtime.campaign.max_rounds == 4
+    assert spec.runtime.mcp.mode == "inprocess"
     assert spec.runtime.mcp.port == 8000
     assert spec.kubernetes.distribution == "eks"
     assert spec.kubernetes.service_type == "ClusterIP"
@@ -182,3 +183,22 @@ def test_load_spec_gpu_off_disables_gpu_workloads(tmp_path: Path) -> None:
     assert spec.gpu.mode == "off"
     assert spec.gpu.mcp_enabled is False
     assert spec.gpu.campaign_enabled is False
+
+
+def test_load_spec_supports_explicit_mcp_service_mode(tmp_path: Path) -> None:
+    config_path = tmp_path / "mcp-service.yaml"
+    _write_yaml(
+        config_path,
+        {
+            "name": "mcp-service",
+            "cloud": {"visibility": "public", "provider": "aws"},
+            "openclaw": {"base_url": "https://openclaw.example.org"},
+            "runtime": {
+                "orchestrator": "kubernetes",
+                "mcp": {"mode": "service"},
+            },
+        },
+    )
+
+    spec = load_spec(config_path)
+    assert spec.runtime.mcp.mode == "service"

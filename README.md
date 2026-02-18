@@ -56,8 +56,8 @@ What this does automatically:
   - ConfigMap
   - Secret templates
   - Campaign output PVC
-  - `refua-mcp` Deployment + Service
   - `ClawCures` CronJob
+  - Optional `refua-mcp` Deployment + Service (`runtime.mcp.mode=service`)
   - Optional Ingress
   - Optional NetworkPolicy
   - `kustomization.yaml`
@@ -171,6 +171,7 @@ Top-level keys:
   - `orchestrator` (`kubernetes` or `compose`)
   - `campaign`
   - `mcp`
+    - `mode` (`inprocess` default, or `service`)
 - `kubernetes`:
   - `distribution` (`eks`, `gke`, `aks`, `oke`, `doks`, `lke`, `vke`, `hke`, `iks`, `ack`, `ske`, `k3s`, `rke2`, `openshift`, `talos`, `kubeadm`, `generic`)
   - `service_type` (`ClusterIP`, `NodePort`, `LoadBalancer`)

@@ -31,6 +31,7 @@ def build_plan(spec: DeploymentSpec, workspace: WorkspaceIntegration) -> dict[st
                 "output_path": spec.runtime.campaign.output_path,
             },
             "mcp": {
+                "mode": spec.runtime.mcp.mode,
                 "image": mcp_image,
                 "replicas": spec.runtime.mcp.replicas,
                 "port": spec.runtime.mcp.port,
@@ -73,7 +74,9 @@ def build_plan(spec: DeploymentSpec, workspace: WorkspaceIntegration) -> dict[st
             "token_secret_key": spec.openclaw.token_secret_key,
         },
         "network": {
-            "expose_mcp": spec.network.expose_mcp,
+            "expose_mcp": (
+                spec.network.expose_mcp and spec.runtime.mcp.mode == "service"
+            ),
             "ingress_host": resolved.ingress_host,
             "allowed_hosts": list(resolved.allowed_hosts),
             "allowed_origins": list(resolved.allowed_origins),
@@ -93,20 +96,26 @@ def build_plan(spec: DeploymentSpec, workspace: WorkspaceIntegration) -> dict[st
 
 
 def _artifact_list(spec: DeploymentSpec, *, ingress_host: str | None) -> list[str]:
+    include_mcp_service = spec.runtime.mcp.mode == "service"
     if spec.uses_kubernetes:
         artifacts = [
             "kubernetes/namespace.yaml",
             "kubernetes/configmap.yaml",
             "kubernetes/secrets.template.yaml",
             "kubernetes/campaign-output-pvc.yaml",
-            "kubernetes/mcp-deployment.yaml",
-            "kubernetes/mcp-service.yaml",
             "kubernetes/campaign-cronjob.yaml",
             "kubernetes/kustomization.yaml",
         ]
+        if include_mcp_service:
+            artifacts.extend(
+                [
+                    "kubernetes/mcp-deployment.yaml",
+                    "kubernetes/mcp-service.yaml",
+                ]
+            )
         if spec.kubernetes.create_network_policy:
             artifacts.append("kubernetes/network-policy.yaml")
-        if spec.network.expose_mcp and ingress_host:
+        if include_mcp_service and spec.network.expose_mcp and ingress_host:
             artifacts.append("kubernetes/mcp-ingress.yaml")
         if spec.automation.bootstrap_cluster:
             artifacts.extend(
