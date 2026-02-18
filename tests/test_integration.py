@@ -49,3 +49,35 @@ version = "0.7.5"
     campaign_image, mcp_image = resolve_images(spec, workspace)
     assert campaign_image.endswith("ClawCures:0.2.1")
     assert mcp_image.endswith("refua-mcp:0.7.5")
+
+
+def test_discover_workspace_includes_extended_refua_projects(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "refua-project"
+    project_names = (
+        "refua-clinical",
+        "refua-data",
+        "refua-regulatory",
+        "refua-studio",
+    )
+    for name in project_names:
+        project_dir = workspace_root / name
+        project_dir.mkdir(parents=True)
+        (project_dir / "pyproject.toml").write_text(
+            (
+                "\n".join(
+                    [
+                        "[project]",
+                        f'name = "{name}"',
+                        'version = "1.2.3"',
+                    ]
+                )
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    workspace = discover_workspace(workspace_root)
+
+    for name in project_names:
+        assert name in workspace.projects
+        assert workspace.projects[name].version == "1.2.3"

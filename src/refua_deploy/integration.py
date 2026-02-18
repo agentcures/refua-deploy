@@ -9,7 +9,17 @@ from typing import Any
 from refua_deploy.models import DeploymentSpec
 
 _DEFAULT_IMAGE_PREFIX = "ghcr.io/agentcures"
-_PROJECT_NAMES = ("ClawCures", "refua-mcp")
+_PROJECT_NAMES = (
+    "ClawCures",
+    "refua-mcp",
+    "refua",
+    "refua-bench",
+    "refua-clinical",
+    "refua-data",
+    "refua-regulatory",
+    "refua-studio",
+    "refua-deploy",
+)
 
 
 @dataclass(slots=True)
