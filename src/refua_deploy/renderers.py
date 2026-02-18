@@ -496,25 +496,11 @@ def _render_private(
     spec: DeploymentSpec,
     workspace: WorkspaceIntegration,
     out_root: Path,
-    resolved: ResolvedAutomation,
+    _resolved: ResolvedAutomation,
 ) -> list[Path]:
-    campaign_image, mcp_image = resolve_images(spec, workspace)
+    campaign_image, _mcp_image = resolve_images(spec, workspace)
     private_dir = out_root / "private"
     private_dir.mkdir(parents=True, exist_ok=True)
-
-    mcp_env: dict[str, Any] = {
-        "REFUA_MCP_TRANSPORT": spec.runtime.mcp.transport,
-        "REFUA_MCP_HOST": "0.0.0.0",
-        "REFUA_MCP_PORT": str(spec.runtime.mcp.port),
-        "REFUA_MCP_ALLOWED_HOSTS": "${REFUA_MCP_ALLOWED_HOSTS:-"
-        + ",".join(resolved.allowed_hosts)
-        + "}",
-        "REFUA_MCP_ALLOWED_ORIGINS": "${REFUA_MCP_ALLOWED_ORIGINS:-"
-        + ",".join(resolved.allowed_origins)
-        + "}",
-        "REFUA_MCP_AUTH_TOKENS": "${REFUA_MCP_AUTH_TOKENS:-}",
-    }
-    mcp_env.update(_gpu_compose_env(spec, enabled=spec.gpu.mcp_enabled))
 
     campaign_env: dict[str, Any] = {
         "REFUA_CAMPAIGN_OPENCLAW_BASE_URL": "${REFUA_CAMPAIGN_OPENCLAW_BASE_URL}",
@@ -524,24 +510,8 @@ def _render_private(
     }
     campaign_env.update(_gpu_compose_env(spec, enabled=spec.gpu.campaign_enabled))
 
-    mcp_service: dict[str, Any] = {
-        "image": mcp_image,
-        "command": ["python", "-m", "refua_mcp.server"],
-        "environment": mcp_env,
-        "ports": [
-            (
-                f"${{REFUA_MCP_EXPOSE_PORT:-{spec.runtime.mcp.port}}}:"
-                f"{spec.runtime.mcp.port}"
-            )
-        ],
-        "restart": "unless-stopped",
-    }
-    if spec.gpu.mode == "required" and spec.gpu.mcp_enabled:
-        mcp_service["gpus"] = "all"
-
     campaign_service: dict[str, Any] = {
         "image": campaign_image,
-        "depends_on": ["refua_mcp"],
         "command": [
             "ClawCures",
             "run-autonomous",
@@ -563,7 +533,6 @@ def _render_private(
 
     compose_doc: dict[str, Any] = {
         "services": {
-            "refua_mcp": mcp_service,
             "campaign_runner": campaign_service,
         }
     }
@@ -577,10 +546,6 @@ def _render_private(
             f"REFUA_CAMPAIGN_OPENCLAW_MODEL={spec.openclaw.model}",
             f"REFUA_CAMPAIGN_TIMEOUT_SECONDS={spec.openclaw.timeout_seconds}",
             "OPENCLAW_GATEWAY_TOKEN=replace-me",
-            "REFUA_MCP_AUTH_TOKENS=replace-me",
-            f"REFUA_MCP_ALLOWED_HOSTS={','.join(resolved.allowed_hosts)}",
-            f"REFUA_MCP_ALLOWED_ORIGINS={','.join(resolved.allowed_origins)}",
-            f"REFUA_MCP_EXPOSE_PORT={spec.runtime.mcp.port}",
             "",
         ]
     )

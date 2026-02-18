@@ -130,16 +130,13 @@ def test_render_private_bundle(tmp_path: Path) -> None:
     assert (output_dir / "private" / ".env.template") in paths
 
     compose_payload = yaml.safe_load((output_dir / "private" / "docker-compose.yaml").read_text())
-    assert set(compose_payload["services"]) == {"refua_mcp", "campaign_runner"}
+    assert set(compose_payload["services"]) == {"campaign_runner"}
     runner_command = compose_payload["services"]["campaign_runner"]["command"]
     assert runner_command[0] == "ClawCures"
     assert "--objective" in runner_command
-    assert compose_payload["services"]["refua_mcp"]["environment"]["REFUA_GPU_MODE"] == "auto"
-    assert "gpus" not in compose_payload["services"]["refua_mcp"]
 
     env_text = (output_dir / "private" / ".env.template").read_text(encoding="utf-8")
     assert "OPENCLAW_GATEWAY_TOKEN=replace-me" in env_text
-    assert "REFUA_MCP_AUTH_TOKENS=replace-me" in env_text
 
 
 def test_render_private_kubernetes_bundle(tmp_path: Path) -> None:
@@ -222,5 +219,4 @@ def test_render_gpu_required_for_kubernetes_and_compose(tmp_path: Path) -> None:
     compose_payload = yaml.safe_load(
         (compose_output / "private" / "docker-compose.yaml").read_text()
     )
-    assert compose_payload["services"]["refua_mcp"]["gpus"] == "all"
     assert compose_payload["services"]["campaign_runner"]["gpus"] == "all"

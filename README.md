@@ -62,8 +62,7 @@ What this does automatically:
   - Optional NetworkPolicy
   - `kustomization.yaml`
 - Compose bundle renderer:
-  - `refua_mcp` service
-  - `campaign_runner` service
+  - `campaign_runner` service (runs `ClawCures` with in-process MCP execution)
   - `.env.template`
 - GPU-aware deployment controls:
   - `gpu.mode=auto` (default): GPU-friendly scheduling/runtime hints with CPU fallback.
@@ -215,7 +214,7 @@ Generated artifacts follow existing Refua runtime contracts:
   - `REFUA_CAMPAIGN_OPENCLAW_MODEL`
   - `REFUA_CAMPAIGN_TIMEOUT_SECONDS`
   - `OPENCLAW_GATEWAY_TOKEN`
-- MCP runtime env vars:
+- MCP runtime env vars (Kubernetes `refua-mcp` deployment):
   - `REFUA_MCP_TRANSPORT`
   - `REFUA_MCP_HOST`
   - `REFUA_MCP_PORT`
