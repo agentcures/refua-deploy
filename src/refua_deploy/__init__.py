@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import tomllib
 from importlib.metadata import version as _distribution_version
 from pathlib import Path
-import tomllib
 
 __all__ = ["__version__"]
 

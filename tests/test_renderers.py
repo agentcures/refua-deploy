@@ -211,6 +211,53 @@ def test_render_private_kubernetes_bundle(tmp_path: Path) -> None:
     assert (output_dir / "private" / "docker-compose.yaml") not in paths
 
 
+def test_render_single_machine_bundle(tmp_path: Path) -> None:
+    spec = spec_from_mapping(
+        {
+            "name": "single-machine",
+            "cloud": {"visibility": "private", "provider": "onprem"},
+            "openclaw": {"base_url": "https://openclaw.local"},
+            "runtime": {
+                "orchestrator": "single-machine",
+                "mcp": {"mode": "service", "port": 9010},
+                "campaign": {"objective": "Run a local dry campaign"},
+            },
+        }
+    )
+    workspace = WorkspaceIntegration(root=tmp_path)
+
+    output_dir = tmp_path / "build-single-machine"
+    paths = render_bundle(spec, workspace, output_dir)
+
+    single_dir = output_dir / "single-machine"
+    install_script = single_dir / "install-ecosystem.sh"
+    env_template = single_dir / ".env.template"
+    mcp_script = single_dir / "run-mcp.sh"
+    campaign_script = single_dir / "run-campaign.sh"
+    studio_script = single_dir / "run-studio.sh"
+
+    assert install_script in paths
+    assert env_template in paths
+    assert mcp_script in paths
+    assert campaign_script in paths
+    assert studio_script in paths
+    assert (output_dir / "private" / "docker-compose.yaml") not in paths
+
+    install_text = install_script.read_text(encoding="utf-8")
+    assert "pip install --upgrade" in install_text
+    assert "refua-studio" in install_text
+
+    campaign_text = campaign_script.read_text(encoding="utf-8")
+    assert "refua_campaign.cli run-autonomous" in campaign_text
+
+    studio_text = studio_script.read_text(encoding="utf-8")
+    assert "--workspace-root" in studio_text
+
+    env_text = env_template.read_text(encoding="utf-8")
+    assert "REFUA_STUDIO_PORT=8787" in env_text
+    assert "REFUA_CAMPAIGN_OBJECTIVE=" in env_text
+
+
 def test_render_gpu_required_for_kubernetes_and_compose(tmp_path: Path) -> None:
     k8s_spec = spec_from_mapping(
         {

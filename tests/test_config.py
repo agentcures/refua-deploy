@@ -202,3 +202,21 @@ def test_load_spec_supports_explicit_mcp_service_mode(tmp_path: Path) -> None:
 
     spec = load_spec(config_path)
     assert spec.runtime.mcp.mode == "service"
+
+
+def test_load_spec_supports_single_machine_orchestrator(tmp_path: Path) -> None:
+    config_path = tmp_path / "single-machine.yaml"
+    _write_yaml(
+        config_path,
+        {
+            "name": "single-machine",
+            "cloud": {"visibility": "private", "provider": "onprem"},
+            "openclaw": {"base_url": "https://openclaw.internal"},
+            "runtime": {
+                "orchestrator": "single-machine",
+            },
+        },
+    )
+
+    spec = load_spec(config_path)
+    assert spec.runtime.orchestrator == "single-machine"

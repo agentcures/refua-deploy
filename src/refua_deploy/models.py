@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 CloudVisibility = Literal["public", "private"]
-OrchestratorType = Literal["kubernetes", "compose"]
+OrchestratorType = Literal["kubernetes", "compose", "single-machine"]
 McpMode = Literal["inprocess", "service"]
 KubernetesDistribution = Literal[
     "generic",
@@ -156,3 +156,7 @@ class DeploymentSpec:
     @property
     def uses_compose(self) -> bool:
         return self.runtime.orchestrator == "compose"
+
+    @property
+    def uses_single_machine(self) -> bool:
+        return self.runtime.orchestrator == "single-machine"

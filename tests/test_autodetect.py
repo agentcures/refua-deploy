@@ -57,3 +57,28 @@ def test_resolve_automation_defaults_compose_local_origins() -> None:
     assert "localhost" in resolved.allowed_hosts
     assert "127.0.0.1" in resolved.allowed_hosts
     assert any(item.startswith("http://localhost:") for item in resolved.allowed_origins)
+
+
+def test_resolve_automation_defaults_single_machine_local_origins() -> None:
+    spec = spec_from_mapping(
+        {
+            "name": "single-box",
+            "cloud": {"visibility": "private", "provider": "onprem"},
+            "openclaw": {"base_url": "https://openclaw.internal"},
+            "runtime": {"orchestrator": "single-machine", "mcp": {"port": 9010}},
+            "network": {"expose_mcp": True},
+        }
+    )
+
+    resolved = resolve_automation(
+        spec,
+        env={
+            "REFUA_DEPLOY_ENABLE_METADATA_HTTP": "0",
+        },
+    )
+
+    assert resolved.ingress_host is None
+    assert "localhost" in resolved.allowed_hosts
+    assert "127.0.0.1" in resolved.allowed_hosts
+    assert "single-box-mcp.single-box.svc.cluster.local" not in resolved.allowed_hosts
+    assert "http://localhost:9010" in resolved.allowed_origins

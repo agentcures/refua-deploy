@@ -2,12 +2,21 @@
 
 `refua-deploy` generates deployment bundles for running Refua campaigns across public and private clouds.
 
-It integrates with sibling projects in this workspace:
+It integrates with the Refua ecosystem packages:
 
-- `ClawCures`
+- `refua`
+- `refua-data`
+- `refua-clinical`
+- `refua-regulatory`
+- `refua-bench`
+- `refua-wetlab`
+- `refua-notebook`
 - `refua-mcp`
+- `ClawCures`
+- `refua-studio`
+- `refua-deploy`
 
-When these projects are present, `refua-deploy` auto-detects their versions and uses matching default image tags.
+When these projects are present, `refua-deploy` auto-detects their versions and can install the full Refua ecosystem (including `refua-studio`).
 
 ## Super Simple
 
@@ -16,6 +25,7 @@ If you just want it working with sensible defaults:
 ```bash
 cd refua-deploy
 poetry install
+poetry run refua-deploy install-ecosystem
 poetry run refua-deploy init --output deploy.yaml --name refua-prod --visibility public --provider aws
 poetry run refua-deploy render --config deploy.yaml --output-dir dist
 bash dist/bootstrap/cluster-bootstrap.sh
@@ -27,6 +37,7 @@ What this does automatically:
 - Enables network auto-discovery and fills ingress/host/origin defaults.
 - Enables cluster bootstrap artifact generation.
 - Enables GPU `auto` mode by default.
+- Installs the full Refua ecosystem from PyPI (including Studio).
 - Detects local `ClawCures` and `refua-mcp` versions for image tags.
 
 ## Goals
@@ -44,6 +55,7 @@ What this does automatically:
 - Runtime target selection:
   - `kubernetes` renderer
   - `compose` renderer
+  - `single-machine` lightweight renderer
 - Automatic network inference:
   - Ingress host from explicit config, env, or inferred metadata defaults
   - Allowed hosts/origins inferred when omitted
@@ -64,6 +76,14 @@ What this does automatically:
 - Compose bundle renderer:
   - `campaign_runner` service (runs `ClawCures` with in-process MCP execution)
   - `.env.template`
+- Single-machine lightweight renderer:
+  - `single-machine/install-ecosystem.sh`
+  - `single-machine/.env.template`
+  - `single-machine/run-mcp.sh`
+  - `single-machine/run-campaign.sh`
+  - `single-machine/run-studio.sh`
+- Full ecosystem installer:
+  - `install-ecosystem` command installs the Refua ecosystem from PyPI in dependency-safe order
 - GPU-aware deployment controls:
   - `gpu.mode=auto` (default): GPU-friendly scheduling/runtime hints with CPU fallback.
   - `gpu.mode=required`: hard GPU requests/limits for Kubernetes and `gpus: all` for Compose.
@@ -75,6 +95,12 @@ What this does automatically:
 ```bash
 cd refua-deploy
 poetry install
+```
+
+Install the full Refua ecosystem (including Studio):
+
+```bash
+poetry run refua-deploy install-ecosystem
 ```
 
 ## Quick Start
@@ -135,6 +161,19 @@ poetry run refua-deploy init \
   --orchestrator kubernetes
 ```
 
+Single-machine lightweight bundle:
+
+```bash
+poetry run refua-deploy init \
+  --output deploy/single-machine.yaml \
+  --visibility private \
+  --provider onprem \
+  --orchestrator single-machine
+poetry run refua-deploy render \
+  --config deploy/single-machine.yaml \
+  --output-dir dist/single-machine
+```
+
 ## Metadata Auto-Discovery
 
 `refua-deploy` can infer network/cluster context from:
@@ -168,7 +207,7 @@ Top-level keys:
 - `openclaw.base_url` (required)
 - `runtime`:
   - `namespace`
-  - `orchestrator` (`kubernetes` or `compose`)
+  - `orchestrator` (`kubernetes`, `compose`, or `single-machine`)
   - `campaign`
   - `mcp`
     - `mode` (`inprocess` default, or `service`)

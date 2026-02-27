@@ -127,6 +127,15 @@ def _artifact_list(spec: DeploymentSpec, *, ingress_host: str | None) -> list[st
             )
         return artifacts
 
+    if spec.uses_single_machine:
+        return [
+            "single-machine/install-ecosystem.sh",
+            "single-machine/.env.template",
+            "single-machine/run-mcp.sh",
+            "single-machine/run-campaign.sh",
+            "single-machine/run-studio.sh",
+        ]
+
     return [
         "private/docker-compose.yaml",
         "private/.env.template",

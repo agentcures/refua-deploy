@@ -10,13 +10,15 @@ from refua_deploy.models import DeploymentSpec
 
 _DEFAULT_IMAGE_PREFIX = "ghcr.io/agentcures"
 _PROJECT_NAMES = (
-    "ClawCures",
-    "refua-mcp",
     "refua",
-    "refua-bench",
-    "refua-clinical",
     "refua-data",
+    "refua-clinical",
     "refua-regulatory",
+    "refua-bench",
+    "refua-wetlab",
+    "refua-notebook",
+    "refua-mcp",
+    "ClawCures",
     "refua-studio",
     "refua-deploy",
 )
@@ -68,6 +70,10 @@ def discover_workspace(root: str | Path | None = None) -> WorkspaceIntegration:
             best_projects = projects
 
     return WorkspaceIntegration(root=best_root, projects=best_projects)
+
+
+def ecosystem_packages() -> tuple[str, ...]:
+    return _PROJECT_NAMES
 
 
 def resolve_images(spec: DeploymentSpec, workspace: WorkspaceIntegration) -> tuple[str, str]:

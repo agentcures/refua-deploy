@@ -83,14 +83,16 @@ def resolve_automation(
 
     ingress_host = _resolve_ingress_host(spec=spec, metadata=metadata, env=env_map)
 
-    service_dns = f"{spec.runtime.namespace}-mcp.{spec.runtime.namespace}.svc.cluster.local"
-    inferred_hosts = [service_dns]
+    inferred_hosts: list[str] = []
+    if spec.uses_kubernetes:
+        service_dns = f"{spec.runtime.namespace}-mcp.{spec.runtime.namespace}.svc.cluster.local"
+        inferred_hosts.append(service_dns)
     if ingress_host:
         inferred_hosts.append(ingress_host)
     private_ip = _first_non_empty(metadata, ["private_ip", "local_ip"])
     if private_ip:
         inferred_hosts.append(private_ip)
-    if spec.uses_compose:
+    if spec.uses_compose or spec.uses_single_machine:
         inferred_hosts.extend(["127.0.0.1", "localhost"])
 
     allowed_hosts = _merge_with_defaults(
@@ -101,7 +103,7 @@ def resolve_automation(
     inferred_origins: list[str] = []
     if ingress_host:
         inferred_origins.append(f"https://{ingress_host}")
-    if spec.uses_compose:
+    if spec.uses_compose or spec.uses_single_machine:
         exposed_port = str(spec.runtime.mcp.port)
         inferred_origins.extend(
             [

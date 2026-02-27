@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
+import subprocess
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -17,9 +19,16 @@ from refua_deploy.config import (
     load_spec,
     starter_mapping,
 )
-from refua_deploy.integration import WorkspaceIntegration, discover_workspace, resolve_images
+from refua_deploy.integration import (
+    WorkspaceIntegration,
+    discover_workspace,
+    ecosystem_packages,
+    resolve_images,
+)
 from refua_deploy.planner import build_plan
 from refua_deploy.renderers import render_bundle
+
+_ECOSYSTEM_PACKAGES = ecosystem_packages()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -126,6 +135,27 @@ def build_parser() -> argparse.ArgumentParser:
     )
     render_parser.set_defaults(handler=_cmd_render)
 
+    install_parser = subparsers.add_parser(
+        "install-ecosystem",
+        help="Install the Refua ecosystem from PyPI",
+    )
+    install_parser.add_argument(
+        "--python",
+        default=sys.executable,
+        help="Python executable used to invoke pip",
+    )
+    install_parser.add_argument(
+        "--upgrade",
+        action="store_true",
+        help="Pass --upgrade to pip install",
+    )
+    install_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print pip commands without executing them",
+    )
+    install_parser.set_defaults(handler=_cmd_install_ecosystem)
+
     return parser
 
 
@@ -192,6 +222,20 @@ def _cmd_render(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_install_ecosystem(args: argparse.Namespace) -> int:
+    python_executable = str(args.python)
+    for package_name in _ECOSYSTEM_PACKAGES:
+        command = [python_executable, "-m", "pip", "install"]
+        if args.upgrade:
+            command.append("--upgrade")
+        command.append(package_name)
+
+        print("$ " + _format_command(command))
+        if not args.dry_run:
+            subprocess.run(command, check=True)
+    return 0
+
+
 def _resolve_provider(*, visibility: str, provider: str | None) -> str:
     if provider is not None and provider.strip():
         resolved = provider.strip().lower()
@@ -219,6 +263,10 @@ def _resolve_default_images(workspace: WorkspaceIntegration) -> tuple[str, str]:
         openclaw=OpenClawSettings(base_url="https://openclaw.invalid"),
     )
     return resolve_images(synthetic, workspace)
+
+
+def _format_command(parts: Sequence[str]) -> str:
+    return " ".join(shlex.quote(item) for item in parts)
 
 
 if __name__ == "__main__":

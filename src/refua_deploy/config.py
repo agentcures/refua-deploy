@@ -18,8 +18,8 @@ from refua_deploy.models import (
     GpuVendor,
     KubernetesDistribution,
     KubernetesServiceType,
-    McpMode,
     KubernetesSettings,
+    McpMode,
     McpSettings,
     NetworkSettings,
     OpenClawSettings,
@@ -51,7 +51,7 @@ PRIVATE_PROVIDERS = {
     "proxmox",
     "nutanix",
 }
-SUPPORTED_ORCHESTRATORS = {"kubernetes", "compose"}
+SUPPORTED_ORCHESTRATORS = {"kubernetes", "compose", "single-machine"}
 KUBERNETES_DISTRIBUTIONS = {
     "generic",
     "eks",

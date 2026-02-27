@@ -8,7 +8,7 @@ import yaml
 
 from refua_deploy.autodetect import ResolvedAutomation, resolve_automation
 from refua_deploy.bootstrap import render_cluster_bootstrap
-from refua_deploy.integration import WorkspaceIntegration, resolve_images
+from refua_deploy.integration import WorkspaceIntegration, ecosystem_packages, resolve_images
 from refua_deploy.models import DeploymentSpec
 from refua_deploy.planner import build_plan
 
@@ -35,6 +35,8 @@ def render_bundle(
         manifest_paths = _render_kubernetes(spec, workspace, out_root, resolved)
         if spec.automation.bootstrap_cluster:
             manifest_paths.extend(render_cluster_bootstrap(spec, resolved, out_root))
+    elif spec.uses_single_machine:
+        manifest_paths = _render_single_machine(spec, out_root, resolved)
     else:
         manifest_paths = _render_private(spec, workspace, out_root, resolved)
 
@@ -67,7 +69,7 @@ def _render_kubernetes(
         "metadata": namespace_metadata,
     }
 
-    configmap_doc = {
+    configmap_doc: dict[str, Any] = {
         "apiVersion": "v1",
         "kind": "ConfigMap",
         "metadata": {
@@ -568,6 +570,159 @@ def _render_private(
     return [compose_path, env_path]
 
 
+def _render_single_machine(
+    spec: DeploymentSpec,
+    out_root: Path,
+    resolved: ResolvedAutomation,
+) -> list[Path]:
+    single_dir = out_root / "single-machine"
+    single_dir.mkdir(parents=True, exist_ok=True)
+
+    install_path = single_dir / "install-ecosystem.sh"
+    env_path = single_dir / ".env.template"
+    mcp_path = single_dir / "run-mcp.sh"
+    campaign_path = single_dir / "run-campaign.sh"
+    studio_path = single_dir / "run-studio.sh"
+
+    packages = ecosystem_packages()
+    install_lines = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "",
+        'ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
+        'VENV_DIR="${VENV_DIR:-$ROOT_DIR/.venv-refua}"',
+        'PYTHON_BIN="${PYTHON_BIN:-python3}"',
+        "",
+        '"$PYTHON_BIN" -m venv "$VENV_DIR"',
+        '"$VENV_DIR/bin/python" -m pip install --upgrade pip',
+        '"$VENV_DIR/bin/python" -m pip install --upgrade \\',
+        *[f"  {package_name} \\" for package_name in packages[:-1]],
+        f"  {packages[-1]}",
+        "",
+        'echo "Refua ecosystem installed in $VENV_DIR"',
+        'echo "Create .env from .env.template, then run ./run-studio.sh or ./run-campaign.sh"',
+    ]
+    _write_script(install_path, install_lines)
+
+    mcp_allowed_hosts = ",".join(resolved.allowed_hosts)
+    mcp_allowed_origins = ",".join(resolved.allowed_origins)
+    campaign_objective_literal = json.dumps(spec.runtime.campaign.objective)
+    env_template = "\n".join(
+        [
+            f"REFUA_CAMPAIGN_OPENCLAW_BASE_URL={spec.openclaw.base_url}",
+            f"REFUA_CAMPAIGN_OPENCLAW_MODEL={spec.openclaw.model}",
+            f"REFUA_CAMPAIGN_TIMEOUT_SECONDS={spec.openclaw.timeout_seconds}",
+            "OPENCLAW_GATEWAY_TOKEN=replace-me",
+            "",
+            f"REFUA_CAMPAIGN_OBJECTIVE={campaign_objective_literal}",
+            f"REFUA_CAMPAIGN_MAX_ROUNDS={spec.runtime.campaign.max_rounds}",
+            f"REFUA_CAMPAIGN_MAX_CALLS={spec.runtime.campaign.max_calls}",
+            "REFUA_CAMPAIGN_OUTPUT_PATH=./outputs/latest_run.json",
+            "",
+            f"REFUA_MCP_TRANSPORT={spec.runtime.mcp.transport}",
+            "REFUA_MCP_HOST=127.0.0.1",
+            f"REFUA_MCP_PORT={spec.runtime.mcp.port}",
+            f"REFUA_MCP_ALLOWED_HOSTS={mcp_allowed_hosts}",
+            f"REFUA_MCP_ALLOWED_ORIGINS={mcp_allowed_origins}",
+            "REFUA_MCP_AUTH_TOKENS=replace-me",
+            "",
+            f"REFUA_GPU_MODE={spec.gpu.mode}",
+            f"REFUA_GPU_VENDOR={spec.gpu.vendor}",
+            f"REFUA_GPU_COUNT={spec.gpu.count}",
+            "",
+            "REFUA_STUDIO_HOST=127.0.0.1",
+            "REFUA_STUDIO_PORT=8787",
+            "REFUA_STUDIO_DATA_DIR=.refua-studio",
+            "REFUA_STUDIO_WORKSPACE_ROOT=.",
+            "",
+        ]
+    )
+    env_path.write_text(env_template, encoding="utf-8")
+
+    mcp_lines = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "",
+        'ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
+        'if [[ -f "$ROOT_DIR/.env" ]]; then',
+        "  set -a",
+        '  source "$ROOT_DIR/.env"',
+        "  set +a",
+        "fi",
+        "",
+        'PYTHON_BIN="${PYTHON_BIN:-$ROOT_DIR/.venv-refua/bin/python}"',
+        'if [[ ! -x "$PYTHON_BIN" ]]; then PYTHON_BIN="python3"; fi',
+        "",
+        'export REFUA_MCP_TRANSPORT="${REFUA_MCP_TRANSPORT:-streamable-http}"',
+        'export REFUA_MCP_HOST="${REFUA_MCP_HOST:-127.0.0.1}"',
+        'export REFUA_MCP_PORT="${REFUA_MCP_PORT:-8000}"',
+        (
+            'export REFUA_MCP_ALLOWED_HOSTS="${REFUA_MCP_ALLOWED_HOSTS:-'
+            'localhost,127.0.0.1}"'
+        ),
+        (
+            'export REFUA_MCP_ALLOWED_ORIGINS="${REFUA_MCP_ALLOWED_ORIGINS:-'
+            'http://localhost:${REFUA_MCP_PORT},http://127.0.0.1:${REFUA_MCP_PORT}}"'
+        ),
+        "",
+        '"$PYTHON_BIN" -m refua_mcp.server',
+    ]
+    _write_script(mcp_path, mcp_lines)
+
+    campaign_lines = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "",
+        'ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
+        'if [[ -f "$ROOT_DIR/.env" ]]; then',
+        "  set -a",
+        '  source "$ROOT_DIR/.env"',
+        "  set +a",
+        "fi",
+        "",
+        'PYTHON_BIN="${PYTHON_BIN:-$ROOT_DIR/.venv-refua/bin/python}"',
+        'if [[ ! -x "$PYTHON_BIN" ]]; then PYTHON_BIN="python3"; fi',
+        'mkdir -p "$ROOT_DIR/outputs"',
+        'CAMPAIGN_OBJECTIVE="${REFUA_CAMPAIGN_OBJECTIVE:-Design and execute a Refua campaign}"',
+        'OUTPUT_PATH="${REFUA_CAMPAIGN_OUTPUT_PATH:-$ROOT_DIR/outputs/latest_run.json}"',
+        "",
+        '"$PYTHON_BIN" -m refua_campaign.cli run-autonomous \\',
+        '  --objective "$CAMPAIGN_OBJECTIVE" \\',
+        f'  --max-rounds "${{REFUA_CAMPAIGN_MAX_ROUNDS:-{spec.runtime.campaign.max_rounds}}}" \\',
+        f'  --max-calls "${{REFUA_CAMPAIGN_MAX_CALLS:-{spec.runtime.campaign.max_calls}}}" \\',
+        '  --output "$OUTPUT_PATH"',
+    ]
+    _write_script(campaign_path, campaign_lines)
+
+    studio_lines = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "",
+        'ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
+        'if [[ -f "$ROOT_DIR/.env" ]]; then',
+        "  set -a",
+        '  source "$ROOT_DIR/.env"',
+        "  set +a",
+        "fi",
+        "",
+        'PYTHON_BIN="${PYTHON_BIN:-$ROOT_DIR/.venv-refua/bin/python}"',
+        'if [[ ! -x "$PYTHON_BIN" ]]; then PYTHON_BIN="python3"; fi',
+        'STUDIO_HOST="${REFUA_STUDIO_HOST:-127.0.0.1}"',
+        'STUDIO_PORT="${REFUA_STUDIO_PORT:-8787}"',
+        'STUDIO_DATA_DIR="${REFUA_STUDIO_DATA_DIR:-$ROOT_DIR/.refua-studio}"',
+        'STUDIO_WORKSPACE_ROOT="${REFUA_STUDIO_WORKSPACE_ROOT:-$ROOT_DIR}"',
+        "",
+        '"$PYTHON_BIN" -m refua_studio \\',
+        '  --host "$STUDIO_HOST" \\',
+        '  --port "$STUDIO_PORT" \\',
+        '  --data-dir "$STUDIO_DATA_DIR" \\',
+        '  --workspace-root "$STUDIO_WORKSPACE_ROOT"',
+    ]
+    _write_script(studio_path, studio_lines)
+
+    return [install_path, env_path, mcp_path, campaign_path, studio_path]
+
+
 def _gpu_container_env(spec: DeploymentSpec, *, enabled: bool) -> list[dict[str, str]]:
     if not enabled or spec.gpu.mode == "off":
         return []
@@ -693,3 +848,9 @@ def _write_yaml_documents(path: Path, payloads: list[dict[str, Any]]) -> None:
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _write_script(path: Path, lines: list[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    path.chmod(0o755)
