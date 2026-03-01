@@ -18,6 +18,11 @@ It integrates with the Refua ecosystem packages:
 
 When these projects are present, `refua-deploy` auto-detects their versions and can install the full Refua ecosystem (including `refua-studio`).
 
+## Guidebook
+
+New to deploying the agent and Studio?
+See the step-by-step guidebook: [GUIDEBOOK.md](GUIDEBOOK.md).
+
 ## Super Simple
 
 If you just want it working with sensible defaults:
