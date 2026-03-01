@@ -118,7 +118,9 @@ def test_load_spec_private_kubernetes_cluster_options(tmp_path: Path) -> None:
     assert spec.kubernetes.namespace_annotations["environment"] == "lab"
 
 
-def test_load_spec_rejects_invalid_private_kubernetes_distribution(tmp_path: Path) -> None:
+def test_load_spec_rejects_invalid_private_kubernetes_distribution(
+    tmp_path: Path,
+) -> None:
     config_path = tmp_path / "bad-private-k8s.yaml"
     _write_yaml(
         config_path,

@@ -70,7 +70,9 @@ def render_cluster_bootstrap(
     return [metadata_path, script_path, network_env_path]
 
 
-def _cluster_bootstrap_script(*, spec: DeploymentSpec, resolved: ResolvedAutomation) -> str:
+def _cluster_bootstrap_script(
+    *, spec: DeploymentSpec, resolved: ResolvedAutomation
+) -> str:
     provider = spec.cloud.provider
     region = spec.cloud.region or str(resolved.metadata.get("region") or "us-east-1")
 
@@ -104,24 +106,30 @@ def _provider_commands(
 ) -> list[str]:
     provider = spec.cloud.provider
     distribution = spec.kubernetes.distribution
-    needs_gpu = spec.gpu.mode != "off" and (spec.gpu.mcp_enabled or spec.gpu.campaign_enabled)
+    needs_gpu = spec.gpu.mode != "off" and (
+        spec.gpu.mcp_enabled or spec.gpu.campaign_enabled
+    )
 
     if provider == "aws" and distribution == "eks":
         subnet_ids = resolved.metadata.get("subnet_ids")
         subnet_flag = ""
         if isinstance(subnet_ids, list) and subnet_ids:
-            subnet_flag = f" --vpc-private-subnets {','.join(str(item) for item in subnet_ids)}"
-        gpu_label_flag = " --node-labels nvidia.com/gpu.present=true" if needs_gpu else ""
+            subnet_flag = (
+                f" --vpc-private-subnets {','.join(str(item) for item in subnet_ids)}"
+            )
+        gpu_label_flag = (
+            " --node-labels nvidia.com/gpu.present=true" if needs_gpu else ""
+        )
         return [
             "echo 'Creating EKS cluster with eksctl'",
             (
                 "eksctl create cluster "
-                "--name \"$CLUSTER_NAME\" "
-                "--region \"$REGION\" "
-                "--version \"$K8S_VERSION\" "
-                "--nodes \"$NODE_COUNT\" "
-                "--node-type \"$NODE_INSTANCE_TYPE\" "
-                "--node-volume-size \"$NODE_DISK_GB\""
+                '--name "$CLUSTER_NAME" '
+                '--region "$REGION" '
+                '--version "$K8S_VERSION" '
+                '--nodes "$NODE_COUNT" '
+                '--node-type "$NODE_INSTANCE_TYPE" '
+                '--node-volume-size "$NODE_DISK_GB"'
                 f"{subnet_flag}{gpu_label_flag}"
             ),
         ]
@@ -132,12 +140,12 @@ def _provider_commands(
         return [
             "echo 'Creating GKE cluster with gcloud'",
             (
-                "gcloud container clusters create \"$CLUSTER_NAME\" "
-                "--region \"$REGION\" "
-                "--cluster-version \"$K8S_VERSION\" "
-                "--num-nodes \"$NODE_COUNT\" "
-                "--machine-type \"$NODE_INSTANCE_TYPE\" "
-                f"--node-locations \"{zone}\"{gpu_flag}"
+                'gcloud container clusters create "$CLUSTER_NAME" '
+                '--region "$REGION" '
+                '--cluster-version "$K8S_VERSION" '
+                '--num-nodes "$NODE_COUNT" '
+                '--machine-type "$NODE_INSTANCE_TYPE" '
+                f'--node-locations "{zone}"{gpu_flag}'
             ),
         ]
 
@@ -148,12 +156,12 @@ def _provider_commands(
             "echo 'Creating AKS cluster with az cli'",
             (
                 "az aks create "
-                f"--resource-group \"{resource_group}\" "
-                "--name \"$CLUSTER_NAME\" "
-                "--location \"$REGION\" "
-                "--kubernetes-version \"$K8S_VERSION\" "
-                "--node-count \"$NODE_COUNT\" "
-                "--node-vm-size \"$NODE_INSTANCE_TYPE\""
+                f'--resource-group "{resource_group}" '
+                '--name "$CLUSTER_NAME" '
+                '--location "$REGION" '
+                '--kubernetes-version "$K8S_VERSION" '
+                '--node-count "$NODE_COUNT" '
+                '--node-vm-size "$NODE_INSTANCE_TYPE"'
                 f"{gpu_flag}"
             ),
         ]
@@ -162,11 +170,11 @@ def _provider_commands(
         return [
             "echo 'Creating DOKS cluster with doctl'",
             (
-                "doctl kubernetes cluster create \"$CLUSTER_NAME\" "
-                "--region \"$REGION\" "
-                "--version \"$K8S_VERSION\" "
-                "--size \"$NODE_INSTANCE_TYPE\" "
-                "--count \"$NODE_COUNT\""
+                'doctl kubernetes cluster create "$CLUSTER_NAME" '
+                '--region "$REGION" '
+                '--version "$K8S_VERSION" '
+                '--size "$NODE_INSTANCE_TYPE" '
+                '--count "$NODE_COUNT"'
             ),
         ]
 
@@ -191,7 +199,7 @@ def _provider_commands(
     if distribution == "kubeadm":
         return [
             "echo 'Bootstrapping kubeadm control-plane node'",
-            "sudo kubeadm init --kubernetes-version \"$K8S_VERSION\"",
+            'sudo kubeadm init --kubernetes-version "$K8S_VERSION"',
             "echo 'Install CNI and join workers with generated token.'",
         ]
 

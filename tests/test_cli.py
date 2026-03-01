@@ -110,12 +110,19 @@ def test_cli_install_ecosystem_executes_expected_package_order(
     )
 
     assert install_rc == 0
-    assert [command[-1] for command in executed_commands] == list(cli_mod._ECOSYSTEM_PACKAGES)
-    assert all(command[0:4] == ["python", "-m", "pip", "install"] for command in executed_commands)
+    assert [command[-1] for command in executed_commands] == list(
+        cli_mod._ECOSYSTEM_PACKAGES
+    )
+    assert all(
+        command[0:4] == ["python", "-m", "pip", "install"]
+        for command in executed_commands
+    )
     assert all("--upgrade" in command for command in executed_commands)
 
 
-def test_cli_plan_single_machine_includes_single_machine_artifacts(tmp_path: Path) -> None:
+def test_cli_plan_single_machine_includes_single_machine_artifacts(
+    tmp_path: Path,
+) -> None:
     config_path = tmp_path / "single-machine.yaml"
     config_path.write_text(
         "\n".join(

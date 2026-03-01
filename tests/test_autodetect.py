@@ -56,7 +56,9 @@ def test_resolve_automation_defaults_compose_local_origins() -> None:
     assert resolved.ingress_host is None
     assert "localhost" in resolved.allowed_hosts
     assert "127.0.0.1" in resolved.allowed_hosts
-    assert any(item.startswith("http://localhost:") for item in resolved.allowed_origins)
+    assert any(
+        item.startswith("http://localhost:") for item in resolved.allowed_origins
+    )
 
 
 def test_resolve_automation_defaults_single_machine_local_origins() -> None:

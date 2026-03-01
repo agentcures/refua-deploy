@@ -77,7 +77,9 @@ def ecosystem_packages() -> tuple[str, ...]:
     return _PROJECT_NAMES
 
 
-def resolve_images(spec: DeploymentSpec, workspace: WorkspaceIntegration) -> tuple[str, str]:
+def resolve_images(
+    spec: DeploymentSpec, workspace: WorkspaceIntegration
+) -> tuple[str, str]:
     campaign_image = spec.runtime.campaign.image
     if not campaign_image:
         campaign_ref = workspace.projects.get("ClawCures")

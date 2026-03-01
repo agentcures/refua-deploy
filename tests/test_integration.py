@@ -18,8 +18,7 @@ def test_discover_workspace_and_resolve_images(tmp_path: Path) -> None:
 [tool.poetry]
 name = "ClawCures"
 version = "0.2.1"
-""".strip()
-        + "\n",
+""".strip() + "\n",
         encoding="utf-8",
     )
     (mcp_dir / "pyproject.toml").write_text(
@@ -27,8 +26,7 @@ version = "0.2.1"
 [project]
 name = "refua-mcp"
 version = "0.7.5"
-""".strip()
-        + "\n",
+""".strip() + "\n",
         encoding="utf-8",
     )
 

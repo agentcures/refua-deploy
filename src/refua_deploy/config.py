@@ -178,7 +178,9 @@ def spec_from_mapping(data: Mapping[str, Any]) -> DeploymentSpec:
     openclaw_raw = _required_mapping(data, "openclaw")
     openclaw_base_url = _required_str(openclaw_raw, "base_url")
     openclaw_model = _optional_str(openclaw_raw, "model") or "openclaw:main"
-    openclaw_timeout = _int(openclaw_raw.get("timeout_seconds", 180), "openclaw.timeout_seconds")
+    openclaw_timeout = _int(
+        openclaw_raw.get("timeout_seconds", 180), "openclaw.timeout_seconds"
+    )
     openclaw_token_secret_name = (
         _optional_str(openclaw_raw, "token_secret_name") or "openclaw-gateway-token"
     )
@@ -214,7 +216,9 @@ def spec_from_mapping(data: Mapping[str, Any]) -> DeploymentSpec:
         objective=_optional_str(campaign_raw, "objective")
         or f"Run a Refua campaign for '{name}'",
         schedule=_optional_str(campaign_raw, "schedule") or "0 */6 * * *",
-        max_rounds=_int(campaign_raw.get("max_rounds", 4), "runtime.campaign.max_rounds"),
+        max_rounds=_int(
+            campaign_raw.get("max_rounds", 4), "runtime.campaign.max_rounds"
+        ),
         max_calls=_int(campaign_raw.get("max_calls", 12), "runtime.campaign.max_calls"),
         output_path=_optional_str(campaign_raw, "output_path")
         or "/var/lib/refua/output/latest_run.json",
@@ -244,10 +248,9 @@ def spec_from_mapping(data: Mapping[str, Any]) -> DeploymentSpec:
     if not isinstance(kubernetes_raw, Mapping):
         raise ValueError("kubernetes must be a mapping if provided")
 
-    distribution_raw = (
-        _optional_str(kubernetes_raw, "distribution")
-        or _default_kubernetes_distribution(provider=provider, visibility=visibility)
-    )
+    distribution_raw = _optional_str(
+        kubernetes_raw, "distribution"
+    ) or _default_kubernetes_distribution(provider=provider, visibility=visibility)
     distribution = _parse_distribution(
         value=distribution_raw,
         visibility=visibility,
@@ -286,7 +289,9 @@ def spec_from_mapping(data: Mapping[str, Any]) -> DeploymentSpec:
 
     default_resource_name = _GPU_RESOURCE_BY_VENDOR[gpu_vendor]
     gpu_resource_name = _optional_str(gpu_raw, "resource_name") or default_resource_name
-    gpu_node_selector = _str_mapping(gpu_raw.get("node_selector", {}), "gpu.node_selector")
+    gpu_node_selector = _str_mapping(
+        gpu_raw.get("node_selector", {}), "gpu.node_selector"
+    )
     gpu_toleration_key = _optional_str(gpu_raw, "toleration_key")
     if gpu_toleration_key is None and gpu_mode != "off":
         gpu_toleration_key = gpu_resource_name
@@ -339,10 +344,13 @@ def spec_from_mapping(data: Mapping[str, Any]) -> DeploymentSpec:
             provisioning_level_raw,
         ),
         cluster_name=_optional_str(automation_raw, "cluster_name"),
-        kubernetes_version=_optional_str(automation_raw, "kubernetes_version") or "1.30",
+        kubernetes_version=_optional_str(automation_raw, "kubernetes_version")
+        or "1.30",
         node_count=_int(automation_raw.get("node_count", 3), "automation.node_count"),
         node_instance_type=_optional_str(automation_raw, "node_instance_type"),
-        node_disk_gb=_int(automation_raw.get("node_disk_gb", 100), "automation.node_disk_gb"),
+        node_disk_gb=_int(
+            automation_raw.get("node_disk_gb", 100), "automation.node_disk_gb"
+        ),
     )
     if automation.node_count < 1:
         raise ValueError("automation.node_count must be >= 1")
@@ -376,7 +384,9 @@ def spec_from_mapping(data: Mapping[str, Any]) -> DeploymentSpec:
     network = NetworkSettings(
         expose_mcp=_bool(network_raw.get("expose_mcp", True), "network.expose_mcp"),
         ingress_host=_optional_str(network_raw, "ingress_host"),
-        allowed_hosts=_str_list(network_raw.get("allowed_hosts", []), "network.allowed_hosts"),
+        allowed_hosts=_str_list(
+            network_raw.get("allowed_hosts", []), "network.allowed_hosts"
+        ),
         allowed_origins=_str_list(
             network_raw.get("allowed_origins", []),
             "network.allowed_origins",
@@ -501,7 +511,9 @@ def starter_mapping(
             "mcp_enabled": resolved_gpu_mode != "off",
             "campaign_enabled": False,
             "node_selector": {},
-            "toleration_key": resolved_gpu_resource if resolved_gpu_mode != "off" else None,
+            "toleration_key": (
+                resolved_gpu_resource if resolved_gpu_mode != "off" else None
+            ),
         },
         "automation": {
             "auto_discover_network": True,
@@ -533,7 +545,9 @@ def starter_mapping(
 def dump_mapping_yaml(path: str | Path, payload: Mapping[str, Any]) -> None:
     out_path = Path(path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(yaml.safe_dump(dict(payload), sort_keys=False), encoding="utf-8")
+    out_path.write_text(
+        yaml.safe_dump(dict(payload), sort_keys=False), encoding="utf-8"
+    )
 
 
 def _required_mapping(data: Mapping[str, Any], key: str) -> Mapping[str, Any]:

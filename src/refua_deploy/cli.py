@@ -41,8 +41,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    init_parser = subparsers.add_parser("init", help="Generate a starter deployment config")
-    init_parser.add_argument("--output", type=Path, required=True, help="Output YAML config path")
+    init_parser = subparsers.add_parser(
+        "init", help="Generate a starter deployment config"
+    )
+    init_parser.add_argument(
+        "--output", type=Path, required=True, help="Output YAML config path"
+    )
     init_parser.add_argument("--name", default="ClawCures-prod", help="Deployment name")
     init_parser.add_argument(
         "--visibility",
@@ -102,8 +106,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     init_parser.set_defaults(handler=_cmd_init)
 
-    plan_parser = subparsers.add_parser("plan", help="Validate a config and emit deployment plan")
-    plan_parser.add_argument("--config", type=Path, required=True, help="Deployment config file")
+    plan_parser = subparsers.add_parser(
+        "plan", help="Validate a config and emit deployment plan"
+    )
+    plan_parser.add_argument(
+        "--config", type=Path, required=True, help="Deployment config file"
+    )
     plan_parser.add_argument(
         "--workspace-root",
         type=Path,
@@ -116,7 +124,9 @@ def build_parser() -> argparse.ArgumentParser:
         "render",
         help="Render deployment manifests and plan artifacts",
     )
-    render_parser.add_argument("--config", type=Path, required=True, help="Deployment config file")
+    render_parser.add_argument(
+        "--config", type=Path, required=True, help="Deployment config file"
+    )
     render_parser.add_argument(
         "--output-dir",
         type=Path,
@@ -214,7 +224,9 @@ def _cmd_render(args: argparse.Namespace) -> int:
     workspace = discover_workspace(args.workspace_root)
 
     if args.output_dir.exists() and any(args.output_dir.iterdir()) and not args.force:
-        raise ValueError("Output directory is not empty. Use --force to overwrite contents.")
+        raise ValueError(
+            "Output directory is not empty. Use --force to overwrite contents."
+        )
 
     paths = render_bundle(spec, workspace, args.output_dir)
     for path in paths:

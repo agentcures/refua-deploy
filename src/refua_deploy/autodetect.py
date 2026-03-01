@@ -85,7 +85,9 @@ def resolve_automation(
 
     inferred_hosts: list[str] = []
     if spec.uses_kubernetes:
-        service_dns = f"{spec.runtime.namespace}-mcp.{spec.runtime.namespace}.svc.cluster.local"
+        service_dns = (
+            f"{spec.runtime.namespace}-mcp.{spec.runtime.namespace}.svc.cluster.local"
+        )
         inferred_hosts.append(service_dns)
     if ingress_host:
         inferred_hosts.append(ingress_host)
@@ -117,13 +119,19 @@ def resolve_automation(
     )
 
     cluster_name = _sanitize_cluster_name(
-        spec.automation.cluster_name or f"{spec.runtime.namespace}-{spec.cloud.provider}"
+        spec.automation.cluster_name
+        or f"{spec.runtime.namespace}-{spec.cloud.provider}"
     )
 
-    needs_gpu = spec.gpu.mode != "off" and (spec.gpu.mcp_enabled or spec.gpu.campaign_enabled)
-    node_instance_type = spec.automation.node_instance_type or _default_node_instance_type(
-        provider=spec.cloud.provider,
-        needs_gpu=needs_gpu,
+    needs_gpu = spec.gpu.mode != "off" and (
+        spec.gpu.mcp_enabled or spec.gpu.campaign_enabled
+    )
+    node_instance_type = (
+        spec.automation.node_instance_type
+        or _default_node_instance_type(
+            provider=spec.cloud.provider,
+            needs_gpu=needs_gpu,
+        )
     )
 
     metadata["resolved_cluster_name"] = cluster_name
@@ -150,7 +158,9 @@ def _resolve_ingress_host(
     if explicit:
         return explicit
 
-    env_host = _first_non_empty(env, ["REFUA_INGRESS_HOST", "REFUA_DEPLOY_INGRESS_HOST"])
+    env_host = _first_non_empty(
+        env, ["REFUA_INGRESS_HOST", "REFUA_DEPLOY_INGRESS_HOST"]
+    )
     if env_host:
         return env_host
 
@@ -234,8 +244,12 @@ def _collect_env_metadata(provider: str, env: Mapping[str, str]) -> dict[str, An
             _first_non_empty(env, ["REFUA_AWS_SUBNET_IDS", "AWS_SUBNET_IDS"])
         )
     elif provider == "gcp":
-        metadata["project_id"] = _first_non_empty(env, ["GOOGLE_CLOUD_PROJECT", "GCP_PROJECT_ID"])
-        metadata["network"] = _first_non_empty(env, ["REFUA_GCP_NETWORK", "GCP_NETWORK"])
+        metadata["project_id"] = _first_non_empty(
+            env, ["GOOGLE_CLOUD_PROJECT", "GCP_PROJECT_ID"]
+        )
+        metadata["network"] = _first_non_empty(
+            env, ["REFUA_GCP_NETWORK", "GCP_NETWORK"]
+        )
         metadata["subnetwork"] = _first_non_empty(
             env,
             ["REFUA_GCP_SUBNETWORK", "GCP_SUBNETWORK"],
@@ -323,7 +337,9 @@ def _collect_gcp_metadata() -> dict[str, Any]:
         if "-" in zone:
             region = zone.rsplit("-", 1)[0]
 
-    network = _http_text(f"{base}/instance/network-interfaces/0/network", headers=headers)
+    network = _http_text(
+        f"{base}/instance/network-interfaces/0/network", headers=headers
+    )
     if network and "/" in network:
         network = network.rsplit("/", 1)[-1]
 
@@ -381,7 +397,9 @@ def _collect_azure_metadata() -> dict[str, Any]:
             else:
                 first_iface = {}
 
-            ipv4_payload = first_iface.get("ipv4") if isinstance(first_iface, dict) else None
+            ipv4_payload = (
+                first_iface.get("ipv4") if isinstance(first_iface, dict) else None
+            )
             if isinstance(ipv4_payload, dict):
                 ip_addresses = ipv4_payload.get("ipAddress")
                 if isinstance(ip_addresses, list) and ip_addresses:

@@ -8,7 +8,11 @@ import yaml
 
 from refua_deploy.autodetect import ResolvedAutomation, resolve_automation
 from refua_deploy.bootstrap import render_cluster_bootstrap
-from refua_deploy.integration import WorkspaceIntegration, ecosystem_packages, resolve_images
+from refua_deploy.integration import (
+    WorkspaceIntegration,
+    ecosystem_packages,
+    resolve_images,
+)
 from refua_deploy.models import DeploymentSpec
 from refua_deploy.planner import build_plan
 
@@ -317,7 +321,9 @@ def _render_kubernetes(
             }
         ],
     }
-    campaign_gpu_resources = _gpu_resource_requests(spec, enabled=spec.gpu.campaign_enabled)
+    campaign_gpu_resources = _gpu_resource_requests(
+        spec, enabled=spec.gpu.campaign_enabled
+    )
     if campaign_gpu_resources is not None:
         campaign_container["resources"] = campaign_gpu_resources
 
@@ -759,7 +765,9 @@ def _gpu_compose_env(spec: DeploymentSpec, *, enabled: bool) -> dict[str, str]:
     return env
 
 
-def _gpu_resource_requests(spec: DeploymentSpec, *, enabled: bool) -> dict[str, Any] | None:
+def _gpu_resource_requests(
+    spec: DeploymentSpec, *, enabled: bool
+) -> dict[str, Any] | None:
     if not enabled or spec.gpu.mode != "required":
         return None
 
@@ -841,13 +849,17 @@ def _write_yaml(path: Path, payload: dict[str, Any]) -> None:
 
 def _write_yaml_documents(path: Path, payloads: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    rendered = "---\n".join(yaml.safe_dump(payload, sort_keys=False) for payload in payloads)
+    rendered = "---\n".join(
+        yaml.safe_dump(payload, sort_keys=False) for payload in payloads
+    )
     path.write_text(rendered, encoding="utf-8")
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def _write_script(path: Path, lines: list[str]) -> None:

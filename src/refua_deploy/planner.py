@@ -3,7 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 from refua_deploy.autodetect import resolve_automation
-from refua_deploy.integration import WorkspaceIntegration, integration_payload, resolve_images
+from refua_deploy.integration import (
+    WorkspaceIntegration,
+    integration_payload,
+    resolve_images,
+)
 from refua_deploy.models import DeploymentSpec
 
 
