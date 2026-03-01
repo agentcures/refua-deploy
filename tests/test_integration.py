@@ -55,6 +55,7 @@ def test_discover_workspace_includes_extended_refua_projects(tmp_path: Path) -> 
     workspace_root = tmp_path / "refua-project"
     project_names = (
         "refua-clinical",
+        "refua-preclinical",
         "refua-data",
         "refua-regulatory",
         "refua-studio",

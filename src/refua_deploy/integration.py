@@ -13,6 +13,7 @@ _PROJECT_NAMES = (
     "refua",
     "refua-data",
     "refua-clinical",
+    "refua-preclinical",
     "refua-regulatory",
     "refua-bench",
     "refua-wetlab",

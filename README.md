@@ -7,6 +7,7 @@ It integrates with the Refua ecosystem packages:
 - `refua`
 - `refua-data`
 - `refua-clinical`
+- `refua-preclinical`
 - `refua-regulatory`
 - `refua-bench`
 - `refua-wetlab`
