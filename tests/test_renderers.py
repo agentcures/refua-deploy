@@ -262,10 +262,16 @@ def test_render_single_machine_bundle(tmp_path: Path) -> None:
 
     studio_text = studio_script.read_text(encoding="utf-8")
     assert "--workspace-root" in studio_text
+    assert "--auth-token" in studio_text
+    assert "--operator-token" in studio_text
+    assert "--admin-token" in studio_text
 
     env_text = env_template.read_text(encoding="utf-8")
     assert "REFUA_STUDIO_PORT=8787" in env_text
     assert "REFUA_CAMPAIGN_OBJECTIVE=" in env_text
+    assert "REFUA_STUDIO_AUTH_TOKENS=" in env_text
+    assert "REFUA_STUDIO_OPERATOR_TOKENS=" in env_text
+    assert "REFUA_STUDIO_ADMIN_TOKENS=" in env_text
 
 
 def test_render_gpu_required_for_kubernetes_and_compose(tmp_path: Path) -> None:

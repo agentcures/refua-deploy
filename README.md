@@ -95,6 +95,11 @@ What this does automatically:
   - `gpu.mode=required`: hard GPU requests/limits for Kubernetes and `gpus: all` for Compose.
   - `gpu.mode=off`: disables GPU behavior.
 - Plan output (`plan.json`) for CI/CD review and approvals.
+- Runtime lifecycle commands:
+  - `apply` (render + apply manifests / compose up)
+  - `status` (kubectl or compose status, plus single-machine artifact status)
+  - `destroy` (kubectl delete / compose down)
+  - `doctor` (preflight diagnostics for toolchain + rendered artifacts)
 
 ## Install
 
@@ -137,6 +142,30 @@ Render artifacts:
 
 ```bash
 poetry run refua-deploy render \
+  --config deploy/public.yaml \
+  --output-dir dist/public
+```
+
+Apply rendered runtime:
+
+```bash
+poetry run refua-deploy apply \
+  --config deploy/public.yaml \
+  --output-dir dist/public
+```
+
+Check runtime status:
+
+```bash
+poetry run refua-deploy status \
+  --config deploy/public.yaml \
+  --output-dir dist/public
+```
+
+Run deployment diagnostics:
+
+```bash
+poetry run refua-deploy doctor \
   --config deploy/public.yaml \
   --output-dir dist/public
 ```
@@ -267,6 +296,10 @@ Generated artifacts follow existing Refua runtime contracts:
   - `REFUA_MCP_ALLOWED_HOSTS`
   - `REFUA_MCP_ALLOWED_ORIGINS`
   - `REFUA_MCP_AUTH_TOKENS`
+- Studio auth env vars (single-machine `.env.template` + `run-studio.sh`):
+  - `REFUA_STUDIO_AUTH_TOKENS`
+  - `REFUA_STUDIO_OPERATOR_TOKENS`
+  - `REFUA_STUDIO_ADMIN_TOKENS`
 - GPU runtime env vars:
   - `REFUA_GPU_MODE`
   - `REFUA_GPU_VENDOR`

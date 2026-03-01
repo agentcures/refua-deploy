@@ -155,3 +155,159 @@ def test_cli_plan_single_machine_includes_single_machine_artifacts(
     assert plan_rc == 0
     plan_payload = json.loads(plan_path.read_text(encoding="utf-8"))
     assert "single-machine/install-ecosystem.sh" in plan_payload["artifacts"]
+
+
+def test_cli_apply_dry_run_kubernetes(tmp_path: Path, capsys: CaptureFixture[str]) -> None:
+    config_path = tmp_path / "apply-k8s.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "name: apply-k8s",
+                "cloud:",
+                "  visibility: public",
+                "  provider: aws",
+                "openclaw:",
+                "  base_url: https://openclaw.example.org",
+                "runtime:",
+                "  orchestrator: kubernetes",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "dist-k8s"
+
+    apply_rc = main(
+        [
+            "apply",
+            "--config",
+            str(config_path),
+            "--output-dir",
+            str(output_dir),
+            "--dry-run",
+        ]
+    )
+
+    assert apply_rc == 0
+    rendered = capsys.readouterr().out
+    assert "kubectl apply -k" in rendered
+    assert (output_dir / "kubernetes" / "kustomization.yaml").exists()
+
+
+def test_cli_destroy_dry_run_compose(tmp_path: Path, capsys: CaptureFixture[str]) -> None:
+    config_path = tmp_path / "destroy-compose.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "name: destroy-compose",
+                "cloud:",
+                "  visibility: private",
+                "  provider: onprem",
+                "openclaw:",
+                "  base_url: https://openclaw.local",
+                "runtime:",
+                "  orchestrator: compose",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "dist-compose"
+
+    destroy_rc = main(
+        [
+            "destroy",
+            "--config",
+            str(config_path),
+            "--output-dir",
+            str(output_dir),
+            "--dry-run",
+        ]
+    )
+
+    assert destroy_rc == 0
+    rendered = capsys.readouterr().out
+    assert "docker compose" in rendered
+    assert "down --remove-orphans" in rendered
+
+
+def test_cli_status_single_machine_outputs_json(
+    tmp_path: Path,
+    capsys: CaptureFixture[str],
+) -> None:
+    config_path = tmp_path / "status-single-machine.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "name: status-single-machine",
+                "cloud:",
+                "  visibility: private",
+                "  provider: onprem",
+                "openclaw:",
+                "  base_url: https://openclaw.local",
+                "runtime:",
+                "  orchestrator: single-machine",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "dist-single-machine"
+
+    status_rc = main(
+        [
+            "status",
+            "--config",
+            str(config_path),
+            "--output-dir",
+            str(output_dir),
+        ]
+    )
+
+    assert status_rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["orchestrator"] == "single-machine"
+    assert payload["scripts"]["run-studio.sh"] is True
+    assert payload["env_files"][".env.template"] is True
+
+
+def test_cli_doctor_single_machine_checks_auth_placeholders(
+    tmp_path: Path,
+    capsys: CaptureFixture[str],
+) -> None:
+    config_path = tmp_path / "doctor-single-machine.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "name: doctor-single-machine",
+                "cloud:",
+                "  visibility: private",
+                "  provider: onprem",
+                "openclaw:",
+                "  base_url: https://openclaw.local",
+                "runtime:",
+                "  orchestrator: single-machine",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "dist-doctor-single-machine"
+
+    doctor_rc = main(
+        [
+            "doctor",
+            "--config",
+            str(config_path),
+            "--output-dir",
+            str(output_dir),
+        ]
+    )
+
+    assert doctor_rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    checks = {item["name"]: item for item in payload["checks"]}
+    assert checks["single_machine_env_has_refua_studio_auth_tokens"]["ok"] is True
+    assert checks["single_machine_env_has_refua_studio_operator_tokens"]["ok"] is True
+    assert checks["single_machine_env_has_refua_studio_admin_tokens"]["ok"] is True
+    assert checks["run_studio_supports_auth_tokens"]["ok"] is True

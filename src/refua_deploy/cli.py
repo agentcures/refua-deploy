@@ -3,10 +3,12 @@ from __future__ import annotations
 import argparse
 import json
 import shlex
+import shutil
 import subprocess
 import sys
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 from refua_deploy.config import (
     PRIVATE_PROVIDERS,
@@ -145,6 +147,102 @@ def build_parser() -> argparse.ArgumentParser:
     )
     render_parser.set_defaults(handler=_cmd_render)
 
+    apply_parser = subparsers.add_parser(
+        "apply",
+        help="Render artifacts and apply deployment runtime commands",
+    )
+    apply_parser.add_argument(
+        "--config", type=Path, required=True, help="Deployment config file"
+    )
+    apply_parser.add_argument(
+        "--workspace-root",
+        type=Path,
+        help="Optional workspace root for local project integration discovery",
+    )
+    apply_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        help="Rendered artifact directory (default: <config-dir>/dist/<name>)",
+    )
+    apply_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print runtime commands without executing them",
+    )
+    apply_parser.set_defaults(handler=_cmd_apply)
+
+    destroy_parser = subparsers.add_parser(
+        "destroy",
+        help="Render artifacts and tear down runtime resources",
+    )
+    destroy_parser.add_argument(
+        "--config", type=Path, required=True, help="Deployment config file"
+    )
+    destroy_parser.add_argument(
+        "--workspace-root",
+        type=Path,
+        help="Optional workspace root for local project integration discovery",
+    )
+    destroy_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        help="Rendered artifact directory (default: <config-dir>/dist/<name>)",
+    )
+    destroy_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print runtime commands without executing them",
+    )
+    destroy_parser.set_defaults(handler=_cmd_destroy)
+
+    status_parser = subparsers.add_parser(
+        "status",
+        help="Show deployment status for rendered runtime targets",
+    )
+    status_parser.add_argument(
+        "--config", type=Path, required=True, help="Deployment config file"
+    )
+    status_parser.add_argument(
+        "--workspace-root",
+        type=Path,
+        help="Optional workspace root for local project integration discovery",
+    )
+    status_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        help="Rendered artifact directory (default: <config-dir>/dist/<name>)",
+    )
+    status_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print runtime commands without executing them",
+    )
+    status_parser.set_defaults(handler=_cmd_status)
+
+    doctor_parser = subparsers.add_parser(
+        "doctor",
+        help="Run deployment preflight diagnostics",
+    )
+    doctor_parser.add_argument(
+        "--config", type=Path, required=True, help="Deployment config file"
+    )
+    doctor_parser.add_argument(
+        "--workspace-root",
+        type=Path,
+        help="Optional workspace root for local project integration discovery",
+    )
+    doctor_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        help="Rendered artifact directory (default: <config-dir>/dist/<name>)",
+    )
+    doctor_parser.add_argument(
+        "--fail-on-error",
+        action="store_true",
+        help="Return non-zero when any diagnostic check fails",
+    )
+    doctor_parser.set_defaults(handler=_cmd_doctor)
+
     install_parser = subparsers.add_parser(
         "install-ecosystem",
         help="Install the Refua ecosystem from PyPI",
@@ -234,6 +332,95 @@ def _cmd_render(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_apply(args: argparse.Namespace) -> int:
+    spec, workspace, output_dir = _load_runtime_context(args)
+    render_bundle(spec, workspace, output_dir)
+    commands = _lifecycle_commands(spec, output_dir, action="apply")
+    if not commands:
+        _print_single_machine_guidance(output_dir)
+        return 0
+
+    for command in commands:
+        _run_runtime_command(command, dry_run=args.dry_run)
+    return 0
+
+
+def _cmd_destroy(args: argparse.Namespace) -> int:
+    spec, workspace, output_dir = _load_runtime_context(args)
+    render_bundle(spec, workspace, output_dir)
+    commands = _lifecycle_commands(spec, output_dir, action="destroy")
+    if not commands:
+        _print_single_machine_destroy_guidance(output_dir)
+        return 0
+
+    for command in commands:
+        _run_runtime_command(command, dry_run=args.dry_run)
+    return 0
+
+
+def _cmd_status(args: argparse.Namespace) -> int:
+    spec, workspace, output_dir = _load_runtime_context(args)
+    render_bundle(spec, workspace, output_dir)
+    commands = _lifecycle_commands(spec, output_dir, action="status")
+    if commands:
+        for command in commands:
+            _run_runtime_command(command, dry_run=args.dry_run)
+        return 0
+
+    payload = _single_machine_status_payload(output_dir)
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0
+
+
+def _cmd_doctor(args: argparse.Namespace) -> int:
+    spec, workspace, output_dir = _load_runtime_context(args)
+    render_bundle(spec, workspace, output_dir)
+
+    checks = [
+        _doctor_check(
+            "python",
+            Path(sys.executable).exists(),
+            f"python executable: {sys.executable}",
+        ),
+        _doctor_check(
+            "workspace_projects_detected",
+            True,
+            f"detected {len(workspace.projects)} local workspace projects",
+        ),
+    ]
+
+    if spec.uses_kubernetes:
+        checks.append(
+            _doctor_check(
+                "kubectl_available",
+                shutil.which("kubectl") is not None,
+                "kubectl is required for kubernetes apply/destroy/status",
+            )
+        )
+    elif spec.uses_compose:
+        checks.append(
+            _doctor_check(
+                "docker_available",
+                shutil.which("docker") is not None,
+                "docker compose is required for compose apply/destroy/status",
+            )
+        )
+    else:
+        checks.extend(_single_machine_doctor_checks(output_dir))
+
+    payload = {
+        "healthy": all(check["ok"] for check in checks),
+        "orchestrator": spec.runtime.orchestrator,
+        "output_dir": str(output_dir),
+        "checks": checks,
+    }
+    print(json.dumps(payload, indent=2, sort_keys=True))
+
+    if args.fail_on_error and not payload["healthy"]:
+        return 1
+    return 0
+
+
 def _cmd_install_ecosystem(args: argparse.Namespace) -> int:
     python_executable = str(args.python)
     for package_name in _ECOSYSTEM_PACKAGES:
@@ -246,6 +433,196 @@ def _cmd_install_ecosystem(args: argparse.Namespace) -> int:
         if not args.dry_run:
             subprocess.run(command, check=True)
     return 0
+
+
+def _resolve_output_dir(
+    *,
+    config_path: Path,
+    deployment_name: str,
+    output_dir: Path | None,
+) -> Path:
+    if output_dir is not None:
+        return output_dir.resolve()
+    return config_path.resolve().parent / "dist" / deployment_name
+
+
+def _load_runtime_context(
+    args: argparse.Namespace,
+) -> tuple[Any, WorkspaceIntegration, Path]:
+    spec = load_spec(args.config)
+    workspace = discover_workspace(args.workspace_root)
+    output_dir = _resolve_output_dir(
+        config_path=args.config,
+        deployment_name=spec.name,
+        output_dir=args.output_dir,
+    )
+    return spec, workspace, output_dir
+
+
+def _compose_env_file(private_dir: Path) -> Path:
+    env_path = private_dir / ".env"
+    if env_path.exists():
+        return env_path
+    return private_dir / ".env.template"
+
+
+def _lifecycle_commands(
+    spec: Any,
+    output_dir: Path,
+    *,
+    action: str,
+) -> list[list[str]]:
+    if spec.uses_kubernetes:
+        kustomize_dir = output_dir / "kubernetes"
+        if action == "apply":
+            return [["kubectl", "apply", "-k", str(kustomize_dir)]]
+        if action == "destroy":
+            return [
+                [
+                    "kubectl",
+                    "delete",
+                    "-k",
+                    str(kustomize_dir),
+                    "--ignore-not-found=true",
+                ]
+            ]
+        if action == "status":
+            return [["kubectl", "get", "all", "-n", spec.runtime.namespace]]
+
+    if spec.uses_compose:
+        private_dir = output_dir / "private"
+        compose_path = private_dir / "docker-compose.yaml"
+        env_file = _compose_env_file(private_dir)
+        base = [
+            "docker",
+            "compose",
+            "-f",
+            str(compose_path),
+            "--env-file",
+            str(env_file),
+        ]
+        if action == "apply":
+            return [base + ["up", "-d"]]
+        if action == "destroy":
+            return [base + ["down", "--remove-orphans"]]
+        if action == "status":
+            return [base + ["ps"]]
+
+    return []
+
+
+def _run_runtime_command(command: Sequence[str], *, dry_run: bool) -> None:
+    print("$ " + _format_command(command))
+    if not dry_run:
+        subprocess.run(list(command), check=True)
+
+
+def _doctor_check(name: str, ok: bool, detail: str) -> dict[str, Any]:
+    return {
+        "name": name,
+        "ok": bool(ok),
+        "detail": detail,
+    }
+
+
+def _single_machine_status_payload(output_dir: Path) -> dict[str, Any]:
+    single_dir = output_dir / "single-machine"
+    scripts = {
+        name: (single_dir / name).exists()
+        for name in (
+            "install-ecosystem.sh",
+            "run-mcp.sh",
+            "run-campaign.sh",
+            "run-studio.sh",
+        )
+    }
+    env_files = {
+        ".env": (single_dir / ".env").exists(),
+        ".env.template": (single_dir / ".env.template").exists(),
+    }
+    return {
+        "orchestrator": "single-machine",
+        "single_machine_dir": str(single_dir),
+        "scripts": scripts,
+        "env_files": env_files,
+    }
+
+
+def _single_machine_doctor_checks(output_dir: Path) -> list[dict[str, Any]]:
+    checks: list[dict[str, Any]] = []
+    single_dir = output_dir / "single-machine"
+    env_template_path = single_dir / ".env.template"
+    run_studio_path = single_dir / "run-studio.sh"
+
+    checks.append(
+        _doctor_check(
+            "bash_available",
+            shutil.which("bash") is not None,
+            "bash is required to run generated single-machine scripts",
+        )
+    )
+    checks.append(
+        _doctor_check(
+            "single_machine_env_template_exists",
+            env_template_path.exists(),
+            f"expected {env_template_path}",
+        )
+    )
+    checks.append(
+        _doctor_check(
+            "single_machine_run_studio_script_exists",
+            run_studio_path.exists(),
+            f"expected {run_studio_path}",
+        )
+    )
+
+    env_text = env_template_path.read_text(encoding="utf-8") if env_template_path.exists() else ""
+    run_studio_text = (
+        run_studio_path.read_text(encoding="utf-8") if run_studio_path.exists() else ""
+    )
+
+    for token_key in (
+        "REFUA_STUDIO_AUTH_TOKENS",
+        "REFUA_STUDIO_OPERATOR_TOKENS",
+        "REFUA_STUDIO_ADMIN_TOKENS",
+        "REFUA_MCP_AUTH_TOKENS",
+    ):
+        checks.append(
+            _doctor_check(
+                f"single_machine_env_has_{token_key.lower()}",
+                token_key in env_text,
+                f"{token_key} placeholder present in single-machine/.env.template",
+            )
+        )
+
+    checks.append(
+        _doctor_check(
+            "run_studio_supports_auth_tokens",
+            "--auth-token" in run_studio_text
+            and "--operator-token" in run_studio_text
+            and "--admin-token" in run_studio_text,
+            "run-studio.sh passes Studio auth token flags when configured",
+        )
+    )
+    return checks
+
+
+def _print_single_machine_guidance(output_dir: Path) -> None:
+    single_dir = output_dir / "single-machine"
+    print(f"Rendered single-machine bundle at: {single_dir}")
+    print(
+        "No automatic 'apply' command for single-machine mode. "
+        "Use run-mcp.sh/run-studio.sh/run-campaign.sh explicitly."
+    )
+
+
+def _print_single_machine_destroy_guidance(output_dir: Path) -> None:
+    single_dir = output_dir / "single-machine"
+    print(f"Single-machine bundle located at: {single_dir}")
+    print(
+        "No automatic 'destroy' action for single-machine mode. "
+        "Stop any manually started processes and remove artifacts if needed."
+    )
 
 
 def _resolve_provider(*, visibility: str, provider: str | None) -> str:
