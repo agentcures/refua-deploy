@@ -46,6 +46,7 @@ packages = [{ include = "refua_deploy", from = "src" }]
 pytest = ">=8.0.0"
 ruff = ">=0.6.0"
 mypy = ">=1.11.0"
+pre-commit = ">=4.5.1"
 types-pyyaml = ">=6.0.12.20250915"
 
 [tool.pytest.ini_options]
