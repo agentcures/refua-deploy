@@ -27,7 +27,7 @@ jobs:
           pip install -e .
           pip install -e ".[test]" || true
           pip install -e ".[dev]" || true
-          pip install pytest ruff mypy build twine
+          pip install pytest ruff mypy build twine types-PyYAML
 
       - name: Ruff
         run: |
