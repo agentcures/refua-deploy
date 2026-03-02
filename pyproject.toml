@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "refua-deploy"
-version = "0.7.0"
+version = "0.7.1"
 description = "Deployment automation for Refua campaign workloads across private and public clouds."
 requires-python = ">=3.11,<3.14"
 authors = [{ name = "JJ Ben-Joseph", email = "jj@tensorspace.ai" }]
