@@ -269,6 +269,10 @@ def test_render_single_machine_bundle(tmp_path: Path) -> None:
     env_text = env_template.read_text(encoding="utf-8")
     assert "REFUA_STUDIO_PORT=8787" in env_text
     assert "REFUA_CAMPAIGN_OBJECTIVE=" in env_text
+    assert (
+        "REFUA_MCP_ALLOWED_HOSTS=127.0.0.1,127.0.0.1:9010,localhost,localhost:9010"
+        in env_text
+    )
     assert "REFUA_STUDIO_AUTH_TOKENS=" in env_text
     assert "REFUA_STUDIO_OPERATOR_TOKENS=" in env_text
     assert "REFUA_STUDIO_ADMIN_TOKENS=" in env_text

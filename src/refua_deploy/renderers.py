@@ -40,7 +40,7 @@ def render_bundle(
         if spec.automation.bootstrap_cluster:
             manifest_paths.extend(render_cluster_bootstrap(spec, resolved, out_root))
     elif spec.uses_single_machine:
-        manifest_paths = _render_single_machine(spec, out_root, resolved)
+        manifest_paths = _render_single_machine(spec, workspace, out_root, resolved)
     else:
         manifest_paths = _render_private(spec, workspace, out_root, resolved)
 
@@ -55,6 +55,12 @@ def _render_kubernetes(
 ) -> list[Path]:
     include_mcp_service = spec.runtime.mcp.mode == "service"
     campaign_image, mcp_image = resolve_images(spec, workspace)
+    mcp_allowed_hosts = ",".join(
+        _allowed_hosts_with_port_variants(
+            hosts=resolved.allowed_hosts,
+            port=spec.runtime.mcp.port,
+        )
+    )
     k8s_dir = out_root / "kubernetes"
     k8s_dir.mkdir(parents=True, exist_ok=True)
 
@@ -96,7 +102,7 @@ def _render_kubernetes(
                 "REFUA_MCP_TRANSPORT": spec.runtime.mcp.transport,
                 "REFUA_MCP_HOST": "0.0.0.0",
                 "REFUA_MCP_PORT": str(spec.runtime.mcp.port),
-                "REFUA_MCP_ALLOWED_HOSTS": ",".join(resolved.allowed_hosts),
+                "REFUA_MCP_ALLOWED_HOSTS": mcp_allowed_hosts,
                 "REFUA_MCP_ALLOWED_ORIGINS": ",".join(resolved.allowed_origins),
             }
         )
@@ -191,7 +197,7 @@ def _render_kubernetes(
                 },
                 {
                     "name": "REFUA_MCP_ALLOWED_HOSTS",
-                    "value": ",".join(resolved.allowed_hosts),
+                    "value": mcp_allowed_hosts,
                 },
                 {
                     "name": "REFUA_MCP_ALLOWED_ORIGINS",
@@ -578,6 +584,7 @@ def _render_private(
 
 def _render_single_machine(
     spec: DeploymentSpec,
+    workspace: WorkspaceIntegration,
     out_root: Path,
     resolved: ResolvedAutomation,
 ) -> list[Path]:
@@ -591,26 +598,67 @@ def _render_single_machine(
     studio_path = single_dir / "run-studio.sh"
 
     packages = ecosystem_packages()
+    workspace_root_default = str(workspace.root)
     install_lines = [
         "#!/usr/bin/env bash",
         "set -euo pipefail",
         "",
         'ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
+        f'WORKSPACE_ROOT="${{REFUA_ECOSYSTEM_WORKSPACE_ROOT:-{workspace_root_default}}}"',
         'VENV_DIR="${VENV_DIR:-$ROOT_DIR/.venv-refua}"',
-        'PYTHON_BIN="${PYTHON_BIN:-python3}"',
+        'if [[ -z "${PYTHON_BIN:-}" ]]; then',
+        '  for _CANDIDATE in python3.12 python3.13 python3.11 python3; do',
+        '    if command -v "$_CANDIDATE" >/dev/null 2>&1; then',
+        '      PYTHON_BIN="$_CANDIDATE"',
+        "      break",
+        "    fi",
+        "  done",
+        "fi",
+        'if [[ -z "${PYTHON_BIN:-}" ]]; then',
+        '  echo "No python3 interpreter found. Install Python 3.12." >&2',
+        "  exit 1",
+        "fi",
+        (
+            'PYTHON_VERSION="$("$PYTHON_BIN" -c '
+            '\'import sys; print("{}.{}".format('
+            'sys.version_info.major, sys.version_info.minor))\')"'
+        ),
+        'case "$PYTHON_VERSION" in',
+        "  3.12) ;;",
+        (
+            '  *) echo "Unsupported Python version $PYTHON_VERSION. '
+            'Full ecosystem install currently requires Python 3.12." >&2; exit 1 ;;'
+        ),
+        "esac",
         "",
         '"$PYTHON_BIN" -m venv "$VENV_DIR"',
         '"$VENV_DIR/bin/python" -m pip install --upgrade pip',
-        '"$VENV_DIR/bin/python" -m pip install --upgrade \\',
-        *[f"  {package_name} \\" for package_name in packages[:-1]],
-        f"  {packages[-1]}",
+        "",
+        "PACKAGES=(",
+        *[f'  "{package_name}"' for package_name in packages],
+        ")",
+        "",
+        'for PACKAGE_NAME in "${PACKAGES[@]}"; do',
+        '  LOCAL_PACKAGE_PATH="$WORKSPACE_ROOT/$PACKAGE_NAME"',
+        '  if [[ -f "$LOCAL_PACKAGE_PATH/pyproject.toml" ]]; then',
+        '    "$VENV_DIR/bin/python" -m pip install --upgrade -e "$LOCAL_PACKAGE_PATH"',
+        "  else",
+        '    "$VENV_DIR/bin/python" -m pip install --upgrade "$PACKAGE_NAME"',
+        "  fi",
+        "done",
         "",
         'echo "Refua ecosystem installed in $VENV_DIR"',
+        'echo "Workspace root used for local editable installs: $WORKSPACE_ROOT"',
         'echo "Create .env from .env.template, then run ./run-studio.sh or ./run-campaign.sh"',
     ]
     _write_script(install_path, install_lines)
 
-    mcp_allowed_hosts = ",".join(resolved.allowed_hosts)
+    mcp_allowed_hosts = ",".join(
+        _allowed_hosts_with_port_variants(
+            hosts=resolved.allowed_hosts,
+            port=spec.runtime.mcp.port,
+        )
+    )
     mcp_allowed_origins = ",".join(resolved.allowed_origins)
     campaign_objective_literal = json.dumps(spec.runtime.campaign.objective)
     env_template = "\n".join(
@@ -783,6 +831,26 @@ def _gpu_container_env(spec: DeploymentSpec, *, enabled: bool) -> list[dict[str,
             ]
         )
     return env
+
+
+def _allowed_hosts_with_port_variants(*, hosts: list[str], port: int) -> list[str]:
+    expanded: list[str] = []
+    seen: set[str] = set()
+    for host in hosts:
+        normalized = host.strip()
+        if not normalized:
+            continue
+
+        candidates = [normalized]
+        if ":" not in normalized:
+            candidates.append(f"{normalized}:{port}")
+
+        for candidate in candidates:
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            expanded.append(candidate)
+    return expanded
 
 
 def _gpu_compose_env(spec: DeploymentSpec, *, enabled: bool) -> dict[str, str]:
