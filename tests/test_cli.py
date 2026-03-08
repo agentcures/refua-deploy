@@ -87,7 +87,7 @@ def test_cli_install_ecosystem_dry_run(capsys: CaptureFixture[str]) -> None:
 
     assert install_rc == 0
     rendered = capsys.readouterr().out
-    assert "pip install refua-studio" in rendered
+    assert "pip install clawcures-ui" in rendered
 
 
 def test_cli_install_ecosystem_executes_expected_package_order(
@@ -307,7 +307,7 @@ def test_cli_doctor_single_machine_checks_auth_placeholders(
     assert doctor_rc == 0
     payload = json.loads(capsys.readouterr().out)
     checks = {item["name"]: item for item in payload["checks"]}
-    assert checks["single_machine_env_has_refua_studio_auth_tokens"]["ok"] is True
-    assert checks["single_machine_env_has_refua_studio_operator_tokens"]["ok"] is True
-    assert checks["single_machine_env_has_refua_studio_admin_tokens"]["ok"] is True
+    assert checks["single_machine_env_has_clawcures_ui_auth_tokens"]["ok"] is True
+    assert checks["single_machine_env_has_clawcures_ui_operator_tokens"]["ok"] is True
+    assert checks["single_machine_env_has_clawcures_ui_admin_tokens"]["ok"] is True
     assert checks["run_studio_supports_auth_tokens"]["ok"] is True

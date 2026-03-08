@@ -9,19 +9,19 @@ from typing import Any
 from refua_deploy.models import DeploymentSpec
 
 _DEFAULT_IMAGE_PREFIX = "ghcr.io/agentcures"
-_PROJECT_NAMES = (
-    "refua",
-    "refua-data",
-    "refua-clinical",
-    "refua-preclinical",
-    "refua-regulatory",
-    "refua-bench",
-    "refua-wetlab",
-    "refua-notebook",
-    "refua-mcp",
-    "ClawCures",
-    "refua-studio",
-    "refua-deploy",
+_PROJECT_CANDIDATES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("refua", ("refua",)),
+    ("refua-data", ("refua-data",)),
+    ("refua-clinical", ("refua-clinical",)),
+    ("refua-preclinical", ("refua-preclinical",)),
+    ("refua-regulatory", ("refua-regulatory",)),
+    ("refua-bench", ("refua-bench",)),
+    ("refua-wetlab", ("refua-wetlab",)),
+    ("refua-notebook", ("refua-notebook",)),
+    ("refua-mcp", ("refua-mcp",)),
+    ("ClawCures", ("ClawCures",)),
+    ("clawcures-ui", ("clawcures-ui", "refua-studio")),
+    ("refua-deploy", ("refua-deploy",)),
 )
 
 
@@ -53,17 +53,19 @@ def discover_workspace(root: str | Path | None = None) -> WorkspaceIntegration:
 
     for candidate in candidate_roots:
         projects: dict[str, ProjectReference] = {}
-        for project_name in _PROJECT_NAMES:
-            project_dir = candidate / project_name
-            pyproject_path = project_dir / "pyproject.toml"
-            if not pyproject_path.exists():
-                continue
-            version = _read_version(pyproject_path)
-            projects[project_name] = ProjectReference(
-                name=project_name,
-                path=project_dir,
-                version=version,
-            )
+        for canonical_name, candidate_names in _PROJECT_CANDIDATES:
+            for project_name in candidate_names:
+                project_dir = candidate / project_name
+                pyproject_path = project_dir / "pyproject.toml"
+                if not pyproject_path.exists():
+                    continue
+                version = _read_version(pyproject_path)
+                projects[canonical_name] = ProjectReference(
+                    name=canonical_name,
+                    path=project_dir,
+                    version=version,
+                )
+                break
 
         if len(projects) > best_count:
             best_count = len(projects)
@@ -74,7 +76,7 @@ def discover_workspace(root: str | Path | None = None) -> WorkspaceIntegration:
 
 
 def ecosystem_packages() -> tuple[str, ...]:
-    return _PROJECT_NAMES
+    return tuple(canonical_name for canonical_name, _aliases in _PROJECT_CANDIDATES)
 
 
 def resolve_images(

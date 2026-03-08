@@ -255,7 +255,7 @@ def test_render_single_machine_bundle(tmp_path: Path) -> None:
 
     install_text = install_script.read_text(encoding="utf-8")
     assert "pip install --upgrade" in install_text
-    assert "refua-studio" in install_text
+    assert "clawcures-ui" in install_text
 
     campaign_text = campaign_script.read_text(encoding="utf-8")
     assert "refua_campaign.cli run-autonomous" in campaign_text
@@ -267,15 +267,15 @@ def test_render_single_machine_bundle(tmp_path: Path) -> None:
     assert "--admin-token" in studio_text
 
     env_text = env_template.read_text(encoding="utf-8")
-    assert "REFUA_STUDIO_PORT=8787" in env_text
+    assert "CLAWCURES_UI_PORT=8787" in env_text
     assert "REFUA_CAMPAIGN_OBJECTIVE=" in env_text
     assert (
         "REFUA_MCP_ALLOWED_HOSTS=127.0.0.1,127.0.0.1:9010,localhost,localhost:9010"
         in env_text
     )
-    assert "REFUA_STUDIO_AUTH_TOKENS=" in env_text
-    assert "REFUA_STUDIO_OPERATOR_TOKENS=" in env_text
-    assert "REFUA_STUDIO_ADMIN_TOKENS=" in env_text
+    assert "CLAWCURES_UI_AUTH_TOKENS=" in env_text
+    assert "CLAWCURES_UI_OPERATOR_TOKENS=" in env_text
+    assert "CLAWCURES_UI_ADMIN_TOKENS=" in env_text
 
 
 def test_render_gpu_required_for_kubernetes_and_compose(tmp_path: Path) -> None:

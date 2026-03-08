@@ -3,7 +3,7 @@
 This guidebook is for new users who want to deploy:
 
 - the Refua agent (`ClawCures`)
-- Refua Studio (`refua-studio`)
+- ClawCures UI (`clawcures-ui`)
 
 The fastest path is a single machine deployment, then moving to Kubernetes when needed.
 
@@ -13,7 +13,7 @@ The fastest path is a single machine deployment, then moving to Kubernetes when 
   the campaign agent that plans and executes discovery workflows.
 - `refua-mcp`:
   the tool/runtime server used by the agent.
-- `refua-studio`:
+- `clawcures-ui`:
   the web control plane for operating campaigns and reviewing outputs.
 
 ## 2. Prerequisites
@@ -147,7 +147,7 @@ Then apply manifests with your standard Kubernetes workflow (`kubectl`, Argo CD,
 - `OPENCLAW_GATEWAY_TOKEN` missing:
   set token in `.env` or secret templates before running agent/studio.
 - `Address already in use`:
-  change `REFUA_MCP_PORT` and/or `REFUA_STUDIO_PORT`.
+  change `REFUA_MCP_PORT` and/or `CLAWCURES_UI_PORT`.
 - Import/runtime dependency errors:
   re-run `install-ecosystem.sh` or `refua-deploy install-ecosystem`.
 - Studio runs but tools unavailable:

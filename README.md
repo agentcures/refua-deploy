@@ -14,10 +14,10 @@ It integrates with the Refua ecosystem packages:
 - `refua-notebook`
 - `refua-mcp`
 - `ClawCures`
-- `refua-studio`
+- `clawcures-ui`
 - `refua-deploy`
 
-When these projects are present, `refua-deploy` auto-detects their versions and can install the full Refua ecosystem (including `refua-studio`).
+When these projects are present, `refua-deploy` auto-detects their versions and can install the full Refua ecosystem (including `clawcures-ui`).
 
 ## Guidebook
 
@@ -297,9 +297,10 @@ Generated artifacts follow existing Refua runtime contracts:
   - `REFUA_MCP_ALLOWED_ORIGINS`
   - `REFUA_MCP_AUTH_TOKENS`
 - Studio auth env vars (single-machine `.env.template` + `run-studio.sh`):
-  - `REFUA_STUDIO_AUTH_TOKENS`
-  - `REFUA_STUDIO_OPERATOR_TOKENS`
-  - `REFUA_STUDIO_ADMIN_TOKENS`
+  - `CLAWCURES_UI_AUTH_TOKENS`
+  - `CLAWCURES_UI_OPERATOR_TOKENS`
+  - `CLAWCURES_UI_ADMIN_TOKENS`
+  Legacy `REFUA_STUDIO_*` env vars are also accepted by generated scripts.
 - GPU runtime env vars:
   - `REFUA_GPU_MODE`
   - `REFUA_GPU_VENDOR`

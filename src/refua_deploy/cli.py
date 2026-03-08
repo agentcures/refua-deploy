@@ -582,9 +582,9 @@ def _single_machine_doctor_checks(output_dir: Path) -> list[dict[str, Any]]:
     )
 
     for token_key in (
-        "REFUA_STUDIO_AUTH_TOKENS",
-        "REFUA_STUDIO_OPERATOR_TOKENS",
-        "REFUA_STUDIO_ADMIN_TOKENS",
+        "CLAWCURES_UI_AUTH_TOKENS",
+        "CLAWCURES_UI_OPERATOR_TOKENS",
+        "CLAWCURES_UI_ADMIN_TOKENS",
         "REFUA_MCP_AUTH_TOKENS",
     ):
         checks.append(
