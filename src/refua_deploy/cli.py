@@ -273,7 +273,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         return int(args.handler(args))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
@@ -576,7 +576,11 @@ def _single_machine_doctor_checks(output_dir: Path) -> list[dict[str, Any]]:
         )
     )
 
-    env_text = env_template_path.read_text(encoding="utf-8") if env_template_path.exists() else ""
+    env_text = (
+        env_template_path.read_text(encoding="utf-8")
+        if env_template_path.exists()
+        else ""
+    )
     run_studio_text = (
         run_studio_path.read_text(encoding="utf-8") if run_studio_path.exists() else ""
     )
@@ -655,7 +659,7 @@ def _resolve_default_images(workspace: WorkspaceIntegration) -> tuple[str, str]:
 
 
 def _format_command(parts: Sequence[str]) -> str:
-    return " ".join(shlex.quote(item) for item in parts)
+    return shlex.join(parts)
 
 
 if __name__ == "__main__":

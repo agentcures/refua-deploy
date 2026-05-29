@@ -157,7 +157,9 @@ def test_cli_plan_single_machine_includes_single_machine_artifacts(
     assert "single-machine/install-ecosystem.sh" in plan_payload["artifacts"]
 
 
-def test_cli_apply_dry_run_kubernetes(tmp_path: Path, capsys: CaptureFixture[str]) -> None:
+def test_cli_apply_dry_run_kubernetes(
+    tmp_path: Path, capsys: CaptureFixture[str]
+) -> None:
     config_path = tmp_path / "apply-k8s.yaml"
     config_path.write_text(
         "\n".join(
@@ -194,7 +196,9 @@ def test_cli_apply_dry_run_kubernetes(tmp_path: Path, capsys: CaptureFixture[str
     assert (output_dir / "kubernetes" / "kustomization.yaml").exists()
 
 
-def test_cli_destroy_dry_run_compose(tmp_path: Path, capsys: CaptureFixture[str]) -> None:
+def test_cli_destroy_dry_run_compose(
+    tmp_path: Path, capsys: CaptureFixture[str]
+) -> None:
     config_path = tmp_path / "destroy-compose.yaml"
     config_path.write_text(
         "\n".join(

@@ -607,7 +607,7 @@ def _render_single_machine(
         f'WORKSPACE_ROOT="${{REFUA_ECOSYSTEM_WORKSPACE_ROOT:-{workspace_root_default}}}"',
         'VENV_DIR="${VENV_DIR:-$ROOT_DIR/.venv-refua}"',
         'if [[ -z "${PYTHON_BIN:-}" ]]; then',
-        '  for _CANDIDATE in python3.12 python3.13 python3.11 python3; do',
+        "  for _CANDIDATE in python3.12 python3.13 python3.11 python3; do",
         '    if command -v "$_CANDIDATE" >/dev/null 2>&1; then',
         '      PYTHON_BIN="$_CANDIDATE"',
         "      break",
@@ -621,7 +621,7 @@ def _render_single_machine(
         (
             'PYTHON_VERSION="$("$PYTHON_BIN" -c '
             '\'import sys; print("{}.{}".format('
-            'sys.version_info.major, sys.version_info.minor))\')"'
+            "sys.version_info.major, sys.version_info.minor))')\""
         ),
         'case "$PYTHON_VERSION" in',
         "  3.12) ;;",
