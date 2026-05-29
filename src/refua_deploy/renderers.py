@@ -767,7 +767,12 @@ def _render_single_machine(
         'STUDIO_HOST="${CLAWCURES_UI_HOST:-${REFUA_STUDIO_HOST:-127.0.0.1}}"',
         'STUDIO_PORT="${CLAWCURES_UI_PORT:-${REFUA_STUDIO_PORT:-8787}}"',
         'DEFAULT_STUDIO_DATA_DIR="$ROOT_DIR/.clawcures-ui"',
-        'if [[ -z "${CLAWCURES_UI_DATA_DIR:-}" && -z "${REFUA_STUDIO_DATA_DIR:-}" && ! -d "$DEFAULT_STUDIO_DATA_DIR" && -d "$ROOT_DIR/.refua-studio" ]]; then',
+        (
+            'if [[ -z "${CLAWCURES_UI_DATA_DIR:-}" '
+            '&& -z "${REFUA_STUDIO_DATA_DIR:-}" '
+            '&& ! -d "$DEFAULT_STUDIO_DATA_DIR" '
+            '&& -d "$ROOT_DIR/.refua-studio" ]]; then'
+        ),
         '  DEFAULT_STUDIO_DATA_DIR="$ROOT_DIR/.refua-studio"',
         "fi",
         'STUDIO_DATA_DIR="${CLAWCURES_UI_DATA_DIR:-${REFUA_STUDIO_DATA_DIR:-$DEFAULT_STUDIO_DATA_DIR}}"',
